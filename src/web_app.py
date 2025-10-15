@@ -795,4 +795,11 @@ def favicon_ico():
 
 
 if __name__ == "__main__":
-    app.run(host="127.0.0.1", port=5000, debug=True)
+    host = os.environ.get("HOST", "127.0.0.1")
+    try:
+        port = int(os.environ.get("PORT", "5000"))
+    except Exception:
+        port = 5000
+    debug_flag = os.environ.get("DEBUG", "1")
+    debug = (debug_flag not in ("0", "false", "False"))
+    app.run(host=host, port=port, debug=debug)

@@ -21,8 +21,12 @@ def progress_hook(d):
         print("\nDownload finished, extracting/converting audio...")
 
 
-def build_opts(outdir: str, audio_format: str, bitrate: int, no_playlist: bool):
+def build_opts(outdir: str, audio_format: str, bitrate: int, no_playlist: bool, outtmpl: str | None, cookiefile: str | None):
     postprocessors = []
+    # Support 'mp4' as an alias for 'm4a' to match user expectation
+    if audio_format == "mp4":
+        audio_format = "m4a"
+
     if audio_format == "mp3":
         postprocessors.append({
             "key": "FFmpegExtractAudio",
@@ -37,15 +41,20 @@ def build_opts(outdir: str, audio_format: str, bitrate: int, no_playlist: bool):
     else:
         raise ValueError("Invalid format. Use 'mp3' or 'm4a'.")
 
-    return {
+    opts = {
         "format": "bestaudio/best",
-        "outtmpl": os.path.join(outdir, "%(title)s.%(ext)s"),
+        "outtmpl": os.path.join(outdir, "%(title)s.%(ext)s") if not outtmpl else outtmpl,
         "postprocessors": postprocessors,
         "noplaylist": no_playlist,
         "restrictfilenames": True,
         "quiet": False,
         "progress_hooks": [progress_hook],
     }
+
+    if cookiefile:
+        opts["cookiefile"] = cookiefile
+
+    return opts
 
 
 def main():
@@ -56,7 +65,7 @@ def main():
     parser.add_argument(
         "-f",
         "--format",
-        choices=["mp3", "m4a"],
+        choices=["mp3", "m4a", "mp4"],
         default="mp3",
         help="Output audio format (mp3 or m4a)",
     )
@@ -78,6 +87,18 @@ def main():
         action="store_true",
         help="Do not download playlists, only the single video",
     )
+    parser.add_argument(
+        "-t",
+        "--template",
+        default=None,
+        help="Custom output template (overrides default). Example: 'downloads/%(title)s.%(ext)s'",
+    )
+    parser.add_argument(
+        "-c",
+        "--cookies",
+        default=None,
+        help="Path to cookies file for sites requiring login",
+    )
 
     args = parser.parse_args()
     os.makedirs(args.output, exist_ok=True)
@@ -86,7 +107,14 @@ def main():
         print("FFmpeg not found on PATH. Install FFmpeg and try again.", file=sys.stderr)
         sys.exit(1)
 
-    ydl_opts = build_opts(args.output, args.format, args.bitrate, args.no_playlist)
+    ydl_opts = build_opts(
+        outdir=args.output,
+        audio_format=args.format,
+        bitrate=args.bitrate,
+        no_playlist=args.no_playlist,
+        outtmpl=args.template,
+        cookiefile=args.cookies,
+    )
     try:
         with YoutubeDL(ydl_opts) as ydl:
             for url in args.urls:

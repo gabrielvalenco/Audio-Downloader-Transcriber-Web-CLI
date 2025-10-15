@@ -47,6 +47,18 @@ Skip playlists:
 python src\\download_audio.py --no-playlist "https://playlist-url"
 ```
 
+Custom output template:
+```bash
+python src\\download_audio.py -t "downloads/%(title)s.%(ext)s" "https://url"
+```
+
+Use cookies file (for sites requiring login):
+```bash
+python src\\download_audio.py -c "C:\\path\\to\\cookies.txt" "https://url"
+```
+
+Note: `--format mp4` is supported as an alias for `m4a` (audio inside MP4 containers is typically `m4a`).
+
 ## Build a standalone executable (Windows)
 ```bash
 pip install pyinstaller
@@ -54,11 +66,23 @@ pyinstaller --onefile src\\download_audio.py
 ```
 The executable will be created under `dist/`. Make sure FFmpeg is installed on the target machine.
 
+Alternatively, use the provided PowerShell scripts:
+```powershell
+# Setup venv and dependencies
+scripts\setup.ps1
+
+# Build the executable
+scripts\build.ps1
+```
+
 ## Project Structure
 ```
 audio/
 ├─ src/
 │  └─ download_audio.py
+├─ scripts/
+│  ├─ setup.ps1
+│  └─ build.ps1
 ├─ .gitignore
 ├─ requirements.txt
 └─ README.md

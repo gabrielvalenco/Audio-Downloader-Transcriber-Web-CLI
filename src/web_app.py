@@ -10,6 +10,12 @@ from yt_dlp import YoutubeDL
 # Reuse helpers from the CLI module
 from download_audio import build_opts, resolve_ffmpeg_location, has_ffmpeg
 
+# Gemini SDK (opcional, só usado na rota /transcribe)
+try:
+    import google.generativeai as genai  # type: ignore
+except Exception:
+    genai = None  # fallback: rota /transcribe retorna erro orientando instalar dependência
+
 app = Flask(__name__)
 # Simple in-memory job store for SSE progress
 jobs: dict[str, dict] = {}
@@ -104,6 +110,29 @@ INDEX_HTML = """
           </div>
         </div>
       </div>
+      <div class="card">
+        <div class="card-header">
+          <h2 class="h1">Transcribe audio</h2>
+        </div>
+        <div class="card-body">
+            <div id="transcribe">
+            <label for="trans-file" style="margin-top:12px;">Audio file</label>
+            <input type="file" id="trans-file" accept="audio/*" />
+            <div class="row-actions" style="margin-top:12px;">
+              <button id="use-recording" class="button-secondary" disabled>Usar última gravação</button>
+              <button id="transcribe-btn" class="btn">Transcrever</button>
+            </div>
+            <div class="examples" id="trans-status" style="display:none; margin-top:8px;"></div>
+            <div id="trans-output-wrap" class="trans-output-wrap" style="display:none; margin-top:12px;">
+              <div class="trans-output-toolbar">
+                <div class="toolbar-title">Transcrição</div>
+                <button id="copy-transcript" class="icon-btn" title="Copiar texto">Copiar</button>
+              </div>
+              <div id="trans-output" class="trans-output"></div>
+            </div>
+          </div>
+        </div>
+      </div>
       <div class="footer">Powered by yt-dlp + FFmpeg • <a href="https://github.com/gabrielvalenco" target="_blank" rel="noopener">github.com/gabrielvalenco</a></div>
       <div class="history" style="display:none;">
         <h3>Histórico</h3>
@@ -128,17 +157,25 @@ INDEX_HTML = """
       const themeToggle = document.getElementById('theme-toggle');
       const openDownloadsBtn = document.getElementById('open-downloads');
       const historyToggle = document.getElementById('toggle-history');
-      const historySection = document.querySelector('.history');
-      // Recorder elements
-      const recStartBtn = document.getElementById('rec-start');
-      const recStopBtn = document.getElementById('rec-stop');
-      const recTimerEl = document.getElementById('rec-timer');
-      const recAudioEl = document.getElementById('rec-audio');
-      const recDownloadBtn = document.getElementById('rec-download');
-      const recDeleteBtn = document.getElementById('rec-delete');
-      const recStatusEl = document.getElementById('rec-status');
-      let recStream = null, mediaRecorder = null, recChunks = [], recBlob = null, recTimer = null, recStartAt = 0, recMime = null;
-      let currentHistoryBtn = null;
+       const historySection = document.querySelector('.history');
+       // Recorder elements
+       const recStartBtn = document.getElementById('rec-start');
+       const recStopBtn = document.getElementById('rec-stop');
+       const recTimerEl = document.getElementById('rec-timer');
+       const recAudioEl = document.getElementById('rec-audio');
+       const recDownloadBtn = document.getElementById('rec-download');
+       const recDeleteBtn = document.getElementById('rec-delete');
+       const recStatusEl = document.getElementById('rec-status');
+       // Transcription elements
+       const transFileInput = document.getElementById('trans-file');
+       const transcribeBtn = document.getElementById('transcribe-btn');
+       const useRecordingBtn = document.getElementById('use-recording');
+        const transStatusEl = document.getElementById('trans-status');
+        const transOutputWrap = document.getElementById('trans-output-wrap');
+        const transOutputEl = document.getElementById('trans-output');
+        const copyTranscriptBtn = document.getElementById('copy-transcript');
+       let recStream = null, mediaRecorder = null, recChunks = [], recBlob = null, recTimer = null, recStartAt = 0, recMime = null;
+       let currentHistoryBtn = null;
 
       const HISTORY_KEY = 'audio_history';
       const HISTORY_VISIBLE_KEY = 'history_visible';
@@ -147,13 +184,15 @@ INDEX_HTML = """
       function applyTheme(t) {
         document.body.classList.toggle('theme-light', t === 'light');
       }
-      const storedTheme = localStorage.getItem('theme') || 'dark';
-      applyTheme(storedTheme);
-      themeToggle.addEventListener('click', () => {
-        const next = document.body.classList.contains('theme-light') ? 'dark' : 'light';
-        applyTheme(next);
-        localStorage.setItem('theme', next);
-      });
+       const storedTheme = localStorage.getItem('theme') || 'dark';
+       applyTheme(storedTheme);
+       themeToggle.addEventListener('click', () => {
+         const next = document.body.classList.contains('theme-light') ? 'dark' : 'light';
+         applyTheme(next);
+         localStorage.setItem('theme', next);
+       });
+
+       // Chave da API agora é lida do ambiente no backend
 
       // Toggle de histórico (padrão oculto)
       function setHistoryVisible(v) {
@@ -191,10 +230,11 @@ INDEX_HTML = """
             recAudioEl.src = url;
             recAudioEl.style.display = 'block';
             recDownloadBtn.disabled = false;
-            recDeleteBtn.disabled = false;
-            recStatusEl.textContent = 'Gravação finalizada';
-            recStatusEl.style.display = 'block';
-          };
+           recDeleteBtn.disabled = false;
+           if (useRecordingBtn) { useRecordingBtn.disabled = false; }
+           recStatusEl.textContent = 'Gravação finalizada';
+           recStatusEl.style.display = 'block';
+         };
           mediaRecorder.start();
           recStartAt = Date.now();
           recTimerEl.style.display = 'block';
@@ -246,6 +286,9 @@ INDEX_HTML = """
         recBlob = null; recChunks = []; recMime = null;
         recDownloadBtn.disabled = true;
         recDeleteBtn.disabled = true;
+        if (useRecordingBtn) { useRecordingBtn.disabled = true; }
+        // se estava preferindo gravação, limpar indicação
+        try { window.preferRec = false; } catch {}
         recStatusEl.textContent = 'Gravação excluída';
         recStatusEl.style.display = 'block';
       });
@@ -357,6 +400,72 @@ INDEX_HTML = """
         }
       }
       openDownloadsBtn.addEventListener('click', openDownloads);
+
+      // Transcrição com Gemini
+      let preferRec = false;
+      useRecordingBtn?.addEventListener('click', () => {
+        preferRec = true;
+        transStatusEl.textContent = 'Usando última gravação';
+        transStatusEl.style.display = 'block';
+      });
+
+      async function transcribe() {
+        transStatusEl.style.display = 'none';
+        transOutputWrap.style.display = 'none';
+        const fd = new FormData();
+        fd.append('model', 'gemini-2.5-flash');
+        const file = (transFileInput && transFileInput.files && transFileInput.files[0]) ? transFileInput.files[0] : null;
+        if (file) {
+          fd.append('audio', file, file.name || 'audio.wav');
+        } else if (recBlob) {
+          const ext = (recMime && recMime.includes('ogg')) ? 'ogg' : 'webm';
+          fd.append('audio', recBlob, `recording.${ext}`);
+        } else {
+          transStatusEl.textContent = 'Selecione um arquivo ou grave áudio.';
+          transStatusEl.style.display = 'block';
+          return;
+        }
+        transcribeBtn.disabled = true;
+        transcribeBtn.classList.add('loading');
+        try {
+          transStatusEl.textContent = 'Transcrevendo…';
+          transStatusEl.style.display = 'block';
+          const res = await fetch('/transcribe', { method: 'POST', body: fd });
+          const data = await res.json().catch(() => null);
+          if (data && data.status === 'ok') {
+            transOutputEl.textContent = (data.text || '').trim() || '(sem texto)';
+            transOutputWrap.style.display = 'block';
+            transStatusEl.textContent = 'Transcrição concluída';
+          } else {
+            transStatusEl.textContent = (data && data.message) || 'Falha na transcrição.';
+          }
+        } catch (e) {
+          transStatusEl.textContent = 'Erro de rede ao transcrever.';
+        } finally {
+          transcribeBtn.disabled = false;
+          transcribeBtn.classList.remove('loading');
+        }
+      }
+      transcribeBtn?.addEventListener('click', transcribe);
+
+      // Copiar resultado
+      copyTranscriptBtn?.addEventListener('click', async () => {
+        const text = (transOutputEl.textContent || '').trim();
+        if (!text) return;
+        try {
+          await navigator.clipboard.writeText(text);
+          const prev = copyTranscriptBtn.textContent;
+          copyTranscriptBtn.textContent = 'Copiado!';
+          copyTranscriptBtn.classList.add('loading');
+          setTimeout(() => { copyTranscriptBtn.textContent = prev; copyTranscriptBtn.classList.remove('loading'); }, 1200);
+        } catch (err) {
+          // fallback simples
+          try {
+            const ta = document.createElement('textarea'); ta.value = text; document.body.appendChild(ta); ta.select(); document.execCommand('copy'); ta.remove();
+            const prev = copyTranscriptBtn.textContent; copyTranscriptBtn.textContent = 'Copiado!'; setTimeout(() => { copyTranscriptBtn.textContent = prev; }, 1200);
+          } catch {}
+        }
+      });
 
       form.addEventListener('submit', async (e) => {
         e.preventDefault();
@@ -552,6 +661,68 @@ def download():
     threading.Thread(target=run_job, args=(job_id, url, ydl_opts, jobs[job_id]), daemon=True).start()
 
     return jsonify({"status": "ok", "job_id": job_id, "outdir": os.path.abspath(outdir)})
+
+
+@app.route("/transcribe", methods=["POST"])
+def transcribe():
+    # Validar dependência
+    if genai is None:  # type: ignore
+        return jsonify({"status": "error", "message": "Dependência 'google-generativeai' não instalada. Rode: python -m pip install google-generativeai"}), 500
+    # Ler chave do ambiente (preferir GEMINI_API_KEY, aceitar GOOGLE_API_KEY)
+    key = os.environ.get("GEMINI_API_KEY") or os.environ.get("GOOGLE_API_KEY")
+    if not key:
+        return jsonify({"status": "error", "message": "Defina a variável de ambiente GEMINI_API_KEY (ou GOOGLE_API_KEY) para usar a transcrição."}), 500
+
+    f = request.files.get("audio")
+    if not f:
+        return jsonify({"status": "error", "message": "Envie um arquivo de áudio ou use a gravação."}), 400
+
+    model_name = (request.form.get("model") or "gemini-2.5-flash").strip()
+    prompt = (request.form.get("prompt") or "Transcribe the audio to text with punctuation.").strip()
+
+    # Ler bytes diretamente e enviar inline ao modelo (evita upload/ragStore)
+    try:
+        # Em alguns ambientes, f.read pode já ter consumido o stream; garantir seek(0)
+        try:
+            audio_bytes = f.read()
+        except Exception:
+            f.stream.seek(0)
+            audio_bytes = f.stream.read()
+
+        mime = (getattr(f, "mimetype", None) or "").strip().lower()
+        if not mime:
+            name = (f.filename or "").lower()
+            if name.endswith(".wav"):
+                mime = "audio/wav"
+            elif name.endswith(".mp3") or name.endswith(".mpeg"):
+                mime = "audio/mpeg"
+            elif name.endswith(".m4a") or name.endswith(".mp4"):
+                mime = "audio/mp4"
+            elif name.endswith(".ogg"):
+                mime = "audio/ogg"
+            elif name.endswith(".webm"):
+                mime = "audio/webm"
+            else:
+                mime = "audio/webm"
+
+        genai.configure(api_key=key)  # type: ignore
+        try:
+            model = genai.GenerativeModel(model_name)  # type: ignore
+        except Exception:
+            model = genai.GenerativeModel("gemini-1.5-flash")  # type: ignore
+
+        parts = [{"mime_type": mime, "data": audio_bytes}, prompt]
+        resp = model.generate_content(parts)  # type: ignore
+
+        text = getattr(resp, "text", None)
+        if not text:
+            try:
+                text = resp.candidates[0].content.parts[0].text  # type: ignore
+            except Exception:
+                text = ""
+        return jsonify({"status": "ok", "text": text or ""})
+    except Exception as e:
+        return jsonify({"status": "error", "message": str(e)}), 500
 
 
 def _sse(data: dict) -> str:

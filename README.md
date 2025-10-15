@@ -28,6 +28,14 @@ pip install -r requirements.txt
 ```
 
 ## Usage
+### Web UI (simple interface)
+Start the local server:
+```powershell
+.\.venv\Scripts\python.exe src\web_app.py
+```
+Open http://localhost:5000/ and paste a video URL (YouTube normal or short), pick `mp3` or `m4a/mp4`, and optionally set the MP3 bitrate or an FFmpeg path.
+
+### CLI
 Basic example (Windows):
 ```bash
 python src\\download_audio.py --format mp3 --output downloads "https://example.com/video-url"

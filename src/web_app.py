@@ -56,6 +56,7 @@ INDEX_HTML = """
 
         <label for="ffmpeg">FFmpeg path (optional)</label>
         <input type="text" id="ffmpeg" name="ffmpeg" placeholder="e.g., tools/ffmpeg/bin or C:\\ffmpeg\\bin" />
+        <p class="examples">Tip: use local FFmpeg via <code>scripts\\install_ffmpeg.ps1</code>, then set <code>tools\\ffmpeg\\bin</code>.</p>
 
         <button type="submit">Convert</button>
       </form>
@@ -92,8 +93,35 @@ def download():
     os.makedirs(outdir, exist_ok=True)
 
     ffmpeg_loc = resolve_ffmpeg_location(ffmpeg_path) if ffmpeg_path else None
+
+    # Auto-detect a local FFmpeg under tools/**/bin if PATH doesn't have it
+    def find_local_ffmpeg_bin() -> str | None:
+        project_root = os.path.dirname(os.path.dirname(__file__))
+        tools_dir = os.path.join(project_root, "tools")
+        if not os.path.isdir(tools_dir):
+            return None
+        # common path produced by our installer
+        direct_bin = os.path.join(tools_dir, "ffmpeg", "bin")
+        if os.path.isfile(os.path.join(direct_bin, "ffmpeg.exe")) or os.path.isfile(os.path.join(direct_bin, "ffmpeg")):
+            return direct_bin
+        # otherwise scan all subdirectories for a bin/ffmpeg(.exe)
+        try:
+            for entry in os.listdir(tools_dir):
+                p = os.path.join(tools_dir, entry)
+                if os.path.isdir(p):
+                    bin_candidate = os.path.join(p, "bin")
+                    if os.path.isfile(os.path.join(bin_candidate, "ffmpeg.exe")) or os.path.isfile(os.path.join(bin_candidate, "ffmpeg")):
+                        return bin_candidate
+        except Exception:
+            return None
+        return None
+
     if not ffmpeg_loc and not has_ffmpeg():
-        return render_template_string(INDEX_HTML, message="FFmpeg not found. Install it or provide the path above.")
+        auto_bin = find_local_ffmpeg_bin()
+        if auto_bin:
+            ffmpeg_loc = auto_bin
+        else:
+            return render_template_string(INDEX_HTML, message="FFmpeg not found. Install it (winget/choco) or run scripts\\install_ffmpeg.ps1 and set tools\\ffmpeg\\bin above.")
 
     ydl_opts = build_opts(
         outdir=outdir,

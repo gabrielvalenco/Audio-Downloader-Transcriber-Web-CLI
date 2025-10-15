@@ -9,14 +9,46 @@ def has_ffmpeg() -> bool:
     return shutil.which("ffmpeg") is not None
 
 
+def _format_bytes(num: float) -> str:
+    for unit in ["B", "KB", "MB", "GB"]:
+        if num < 1024.0:
+            return f"{num:3.1f} {unit}"
+        num /= 1024.0
+    return f"{num:.1f} TB"
+
+
+def _format_eta(seconds: int | None) -> str:
+    if not seconds or seconds < 0:
+        return "--:--"
+    m, s = divmod(int(seconds), 60)
+    h, m = divmod(m, 60)
+    if h:
+        return f"{h:02d}:{m:02d}:{s:02d}"
+    return f"{m:02d}:{s:02d}"
+
+
+def _bar(pct: float, width: int = 30) -> str:
+    pct = max(0.0, min(100.0, pct))
+    filled = int(width * pct / 100.0)
+    return "#" * filled + "." * (width - filled)
+
+
 def progress_hook(d):
     status = d.get("status")
     if status == "downloading":
-        total = d.get("total_bytes") or d.get("total_bytes_estimate")
-        downloaded = d.get("downloaded_bytes", 0)
-        if total:
-            pct = downloaded / total * 100
-            print(f"{pct:5.1f}% downloading...", end="\r", flush=True)
+        total = d.get("total_bytes") or d.get("total_bytes_estimate") or 0
+        downloaded = d.get("downloaded_bytes", 0) or 0
+        speed = d.get("speed") or 0
+        eta = d.get("eta")
+        pct = (downloaded / total * 100) if total else 0.0
+
+        bar = _bar(pct)
+        dl_str = _format_bytes(downloaded)
+        tot_str = _format_bytes(total) if total else "?"
+        spd_str = _format_bytes(speed) + "/s" if speed else "--"
+        eta_str = _format_eta(eta)
+        msg = f"[{bar}] {pct:5.1f}%  {dl_str}/{tot_str}  {spd_str}  ETA {eta_str}"
+        print(msg, end="\r", flush=True)
     elif status == "finished":
         print("\nDownload finished, extracting/converting audio...")
 
@@ -47,7 +79,8 @@ def build_opts(outdir: str, audio_format: str, bitrate: int, no_playlist: bool, 
         "postprocessors": postprocessors,
         "noplaylist": no_playlist,
         "restrictfilenames": True,
-        "quiet": False,
+        "quiet": True,
+        "no_warnings": True,
         "progress_hooks": [progress_hook],
     }
 

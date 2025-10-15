@@ -1,111 +1,136 @@
-# Audio Downloader CLI
+# Audio Downloader & Transcriber (Web + CLI)
 
-Simple command-line tool to download videos and extract audio as MP3 or M4A using `yt-dlp` and `FFmpeg`.
+Download audio from videos via `yt-dlp` + `FFmpeg`, record audio in-browser, and transcribe files/recordings using an AI transcription model. Includes a simple Web UI, CLI, and Docker support for streamlined setup.
 
-## Features
-- Downloads from many sites supported by `yt-dlp` (e.g., YouTube).
-- Extracts audio as `mp3` (with configurable bitrate) or `m4a`.
-- Handles single videos or playlists.
-- Progress feedback in the terminal.
-- Output directory customization.
+## Highlights
+- Web UI: paste a video URL (YouTube/Shorts) and pick `mp3` or `m4a/mp4`.
+- Transcription: upload or record audio and get text instantly; copy button included.
+- Recording: in-browser recording (ogg/webm) with playable previews.
+- CLI: fast downloads with bitrate control and templates.
+- Docker: one-command setup with FFmpeg preinstalled.
+- Windows-friendly: no need to modify PATH when using Docker.
 
-## Prerequisites
-- Python 3.10+ installed.
-- FFmpeg installed and available on your `PATH`.
+## Prerequisites (local run)
+- Python 3.10+.
+- FFmpeg installed and available on `PATH`.
   - Windows: `winget install Gyan.FFmpeg` or `choco install ffmpeg`
-  - Or install a local copy with `scripts\install_ffmpeg.ps1` and use `--ffmpeg` to point to it.
+  - Or install a local copy with `scripts\install_ffmpeg.ps1` and use `--ffmpeg`.
+- Transcription API key:
+  - Set `GEMINI_API_KEY` as an environment variable before starting the server.
 
-## Setup
-```bash
-pip install -r requirements.txt
-```
-
-Optionally use a virtual environment:
-```bash
-python -m venv .venv
-.venv\\Scripts\\activate
-pip install -r requirements.txt
-```
-
-## Usage
-### Web UI (simple interface)
-Start the local server:
+## Quick Start (Web UI)
 ```powershell
-.\.venv\Scripts\python.exe src\web_app.py
-```
-Open http://localhost:5000/ and paste a video URL (YouTube normal or short), pick `mp3` or `m4a/mp4`, and optionally set the MP3 bitrate or an FFmpeg path.
+# Install dependencies
+pip install -r requirements.txt
 
-### CLI
-Basic example (Windows):
+# Set transcription API key
+$env:GEMINI_API_KEY="<your_key_here>"
+
+# Run the server
+python src/web_app.py
+```
+Open `http://localhost:5000/`, paste a video URL, choose `mp3` or `m4a/mp4`, and optionally set MP3 bitrate or a custom FFmpeg path.
+
+## Docker (recommended for a consistent setup)
+### Using Docker Compose
+1) Optionally create a `.env` file with:
+```
+GEMINI_API_KEY=<your_key_here>
+```
+2) Start the app:
+```powershell
+docker compose up --build
+```
+3) Open `http://localhost:5000/`.
+
+Compose mounts local folders for development:
+- `./src` and `./src/static` for live changes in debug.
+- `./downloads` to persist outputs on the host.
+
+### Using plain Docker
+```powershell
+# Build image
+docker build -t audio-downloader-web .
+
+# Run container (Windows PowerShell example)
+docker run --rm -p 5000:5000 \
+  -e GEMINI_API_KEY="<your_key_here>" \
+  -e HOST=0.0.0.0 -e PORT=5000 -e DEBUG=1 \
+  -v "$(Get-Location)\downloads":/app/downloads \
+  audio-downloader-web
+```
+On bash shells, replace the volume flag with `-v "$(pwd)/downloads:/app/downloads"`.
+
+## CLI Usage
+Basic (Windows):
 ```bash
-python src\\download_audio.py --format mp3 --output downloads "https://example.com/video-url"
+python src/download_audio.py --format mp3 --output downloads "https://example.com/video-url"
 ```
 
 Multiple URLs:
 ```bash
-python src\\download_audio.py -f m4a -o downloads "https://url1" "https://url2"
+python src/download_audio.py -f m4a -o downloads "https://url1" "https://url2"
 ```
 
-Control bitrate for MP3 (in kbps):
+Control bitrate for MP3 (kbps):
 ```bash
-python src\\download_audio.py -f mp3 -b 192 "https://url"
+python src/download_audio.py -f mp3 -b 192 "https://url"
 ```
 
 Skip playlists:
 ```bash
-python src\\download_audio.py --no-playlist "https://playlist-url"
+python src/download_audio.py --no-playlist "https://playlist-url"
 ```
 
 Custom output template:
 ```bash
-python src\\download_audio.py -t "downloads/%(title)s.%(ext)s" "https://url"
+python src/download_audio.py -t "downloads/%(title)s.%(ext)s" "https://url"
 ```
 
 Use cookies file (for sites requiring login):
 ```bash
-python src\\download_audio.py -c "C:\\path\\to\\cookies.txt" "https://url"
+python src/download_audio.py -c "C:\path\to\cookies.txt" "https://url"
 ```
 
-Note: `--format mp4` is supported as an alias for `m4a` (audio inside MP4 containers is typically `m4a`).
- 
 Use a local FFmpeg without touching system PATH:
 ```bash
-python src\\download_audio.py --ffmpeg "tools/ffmpeg/bin" -f mp3 "https://url"
+python src/download_audio.py --ffmpeg "tools/ffmpeg/bin" -f mp3 "https://url"
 ```
 
-## Build a standalone executable (Windows)
-```bash
-pip install pyinstaller
-pyinstaller --onefile src\\download_audio.py
-```
-The executable will be created under `dist/`. Make sure FFmpeg is installed on the target machine.
-
-Alternatively, use the provided PowerShell scripts:
-```powershell
-# Setup venv and dependencies
-scripts\setup.ps1
-
-# Build the executable
-scripts\build.ps1
- 
-# Install a local FFmpeg (no admin required)
-scripts\install_ffmpeg.ps1
-```
+## Configuration
+- Environment variables for the Web UI:
+  - `GEMINI_API_KEY`: required for transcription.
+  - `HOST`: default `0.0.0.0` in Docker, `127.0.0.1` locally.
+  - `PORT`: default `5000`.
+  - `DEBUG`: `1` or `0`.
+- FFmpeg path can be set in the Web UI if not on PATH.
 
 ## Project Structure
 ```
 audio/
 ├─ src/
-│  └─ download_audio.py
+│  ├─ web_app.py
+│  ├─ download_audio.py
+│  └─ static/
+│     └─ style.css
 ├─ scripts/
 │  ├─ setup.ps1
 │  ├─ build.ps1
 │  └─ install_ffmpeg.ps1
+├─ Dockerfile
+├─ docker-compose.yml
+├─ .dockerignore
 ├─ .gitignore
 ├─ requirements.txt
 └─ README.md
 ```
 
+## Troubleshooting
+- 500 Internal Server Error on transcription: ensure `GEMINI_API_KEY` is set.
+- Clipboard copy issues: the UI includes a fallback method if permissions are restricted.
+- "Open downloads" inside containers cannot launch the host’s file explorer; open `./downloads` on your machine directly.
+- If FFmpeg is missing locally, either install it or run with Docker.
+
 ## Notes
 - Respect platform terms of use and copyright.
-- This tool should not be used to circumvent technical protection measures.
+- Do not use this tool to circumvent technical protection measures.

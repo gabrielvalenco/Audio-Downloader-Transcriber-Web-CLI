@@ -22,74 +22,18 @@ INDEX_HTML = """
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <title>Audio Downloader</title>
     <link rel="icon" href="/favicon.svg" type="image/svg+xml" />
-    <style>
-      :root {
-        --bg: #0b0f1a;
-        --card: rgba(20, 24, 38, 0.9);
-        --border: rgba(255,255,255,0.08);
-        --accent: #7c3aed;
-        --accent-2: #22d3ee;
-        --text: #e7e7ea;
-        --muted: #a3a3b2;
-        --error: #ef4444;
-        --success: #10b981;
-      }
-      .theme-light {
-        --bg: #f6f7fb;
-        --card: rgba(255, 255, 255, 0.9);
-        --border: rgba(0,0,0,0.08);
-        --accent: #3b82f6;
-        --accent-2: #22c55e;
-        --text: #191b22;
-        --muted: #5b5e6a;
-      }
-      * { box-sizing: border-box; }
-      body { margin:0; font-family: ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Inter, Arial, sans-serif; color: var(--text); background: radial-gradient(1200px 600px at 10% 10%, #0e1726 0%, var(--bg) 40%, #0a0e19 100%); min-height:100vh; transition: background .25s ease; }
-      .container { max-width: 900px; margin: 0 auto; padding: 32px; }
-      .header { display:flex; align-items:center; justify-content:space-between; margin-bottom: 24px; gap:12px; }
-      .brand { font-weight: 700; letter-spacing: 0.3px; font-size: 1.1rem; color: var(--muted); }
-      .card { border: 1px solid var(--border); background: var(--card); backdrop-filter: blur(8px); border-radius: 16px; overflow: hidden; }
-      .card-header { padding: 20px 24px; border-bottom: 1px solid var(--border); display:flex; align-items:center; gap:12px; }
-      .h1 { font-size: 1.25rem; margin:0; }
-      .badge { background: linear-gradient(135deg, var(--accent), var(--accent-2)); color:#fff; padding:6px 10px; border-radius:999px; font-size:0.75rem; }
-      .card-body { padding: 24px; }
-      label { font-size: 0.9rem; color: var(--muted); margin-bottom: 8px; display:block; }
-      input[type=text], select { width:100%; padding:12px 14px; border-radius:10px; border:1px solid var(--border); background:#0b1220; color:var(--text); outline: none; transition: border-color .2s, box-shadow .2s; }
-      input[type=text]:focus, select:focus { border-color: #3b82f6; box-shadow: 0 0 0 4px rgba(59,130,246,0.15); }
-      .grid { display:grid; grid-template-columns: 1fr 1fr; gap:16px; }
-      .btn { margin-top: 16px; padding: 12px 16px; border-radius: 10px; border: none; color:#fff; cursor:pointer; font-weight:600; background: linear-gradient(135deg, #3b82f6, #22c55e); box-shadow: 0 8px 20px rgba(34,197,94,0.25); transition: transform .15s ease, box-shadow .2s ease; }
-      .btn:hover { transform: translateY(-1px); box-shadow: 0 10px 24px rgba(34,197,94,0.32); }
-      .btn:disabled { opacity:0.6; cursor:not-allowed; }
-      .examples { margin-top:8px; color: var(--muted); font-size: 0.85rem; }
-      .chips { display:flex; gap:8px; flex-wrap: wrap; margin-top:8px; }
-      .chip { font-size:0.8rem; padding:6px 10px; border-radius:999px; border:1px solid var(--border); cursor:pointer; background:#0b1220; color:var(--text); }
-      .chip:hover { border-color:#3b82f6; }
-      .msg { margin-top: 16px; padding: 12px; border-radius: 10px; border: 1px solid var(--border); }
-      .msg.success { background: rgba(16,185,129,0.12); border-color: rgba(16,185,129,0.35); }
-      .msg.error { background: rgba(239,68,68,0.12); border-color: rgba(239,68,68,0.35); }
-      .footer { margin-top: 24px; text-align:center; color: var(--muted); font-size: 0.85rem; }
-      .overlay { position:fixed; inset:0; background: rgba(0,0,0,0.35); backdrop-filter: blur(2px); display:none; align-items:center; justify-content:center; z-index: 1000; }
-      .spinner { width: 56px; height: 56px; border: 6px solid rgba(59,130,246,0.25); border-top-color: #3b82f6; border-radius: 50%; animation: spin 0.85s linear infinite; }
-      @keyframes spin { to { transform: rotate(360deg); } }
-      .progress { margin-top:16px; height: 14px; background: #0b1220; border:1px solid var(--border); border-radius: 999px; overflow:hidden; }
-      .progress > .bar { height:100%; width:0%; background: linear-gradient(135deg, var(--accent), var(--accent-2)); transition: width .2s ease; }
-      .row-actions { display:flex; gap:8px; align-items:center; justify-content:space-between; margin-top:12px; }
-      .button-secondary { padding: 10px 14px; border-radius: 10px; border: 1px solid var(--border); background: #0b1220; color: var(--text); cursor: pointer; }
-      .button-secondary:hover { border-color:#3b82f6; }
-      .history { margin-top:24px; }
-      .history h3 { margin:0 0 12px; font-size:1rem; color: var(--muted); }
-      .history-list { display:flex; flex-direction:column; gap:8px; }
-      .history-item { padding:10px 12px; border:1px solid var(--border); border-radius:10px; display:flex; align-items:center; gap:8px; justify-content:space-between; }
-      .history-item .meta { color: var(--muted); font-size:0.85rem; }
-      .toggle { padding:8px 12px; border-radius:999px; border:1px solid var(--border); background:#0b1220; color:var(--text); cursor:pointer; }
-    </style>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
   </head>
   <body>
     <div class="container">
       <div class="header">
-        <div class="brand">Audio Downloader</div>
-        <div class="badge">YouTube → MP3/M4A</div>
+      <div class="brand">Audio Downloader</div>
+      <div class="badge">YouTube → MP3/M4A</div>
         <button id="theme-toggle" class="toggle" title="Alternar tema">Tema</button>
+        <button id="toggle-history" class="toggle" title="Mostrar histórico">Histórico</button>
       </div>
       <div class="card">
         <div class="card-header">
@@ -100,17 +44,25 @@ INDEX_HTML = """
             <label for="url">Video URL</label>
             <input type="text" id="url" name="url" placeholder="Paste the YouTube video or Shorts URL" required />
             <div class="chips">
-              <span class="chip" data-url="https://youtu.be/L8OesNa-pkA?si=a-cVuXG6FEu7IfyD">Sample video</span>
-              <span class="chip" data-url="https://youtube.com/shorts/FT_9NOYwWqk?si=eZnIQYx140IKBLlJ">Sample short</span>
+              <span class="chip chip-video" data-url="https://youtu.be/L8OesNa-pkA?si=a-cVuXG6FEu7IfyD">Sample video</span>
+              <span class="chip chip-short" data-url="https://youtube.com/shorts/FT_9NOYwWqk?si=eZnIQYx140IKBLlJ">Sample short</span>
             </div>
             <div class="grid" style="margin-top:16px;">
               <div>
                 <label for="format">Audio Format</label>
-                <select id="format" name="format">
+                <select id="format" name="format" class="hidden-select">
                   <option value="mp3" selected>MP3</option>
                   <option value="m4a">M4A</option>
                   <option value="mp4">MP4 (alias for M4A)</option>
                 </select>
+                <div class="select-wrap" id="format-custom">
+                  <button type="button" id="format-display" class="select-display">MP3</button>
+                  <div id="format-menu" class="select-menu" role="listbox" aria-labelledby="format-display">
+                    <div class="select-item" role="option" data-val="mp3">MP3</div>
+                    <div class="select-item" role="option" data-val="m4a">M4A</div>
+                    <div class="select-item" role="option" data-val="mp4">MP4 (alias for M4A)</div>
+                  </div>
+                </div>
               </div>
               <div>
                 <label for="bitrate">Bitrate (MP3)</label>
@@ -131,7 +83,7 @@ INDEX_HTML = """
         </div>
       </div>
       <div class="footer">Powered by yt-dlp + FFmpeg</div>
-      <div class="history">
+      <div class="history" style="display:none;">
         <h3>Histórico</h3>
         <div id="history-list" class="history-list"></div>
       </div>
@@ -144,14 +96,21 @@ INDEX_HTML = """
       const overlay = document.getElementById('overlay');
       const urlInput = document.getElementById('url');
       const formatSel = document.getElementById('format');
+      const formatWrap = document.getElementById('format-custom');
+      const formatDisplay = document.getElementById('format-display');
+      const formatMenu = document.getElementById('format-menu');
       const bitrateInput = document.getElementById('bitrate');
       const progress = document.getElementById('progress');
       const progressBar = document.getElementById('progress-bar');
       const statusEl = document.getElementById('status');
       const themeToggle = document.getElementById('theme-toggle');
       const openDownloadsBtn = document.getElementById('open-downloads');
+      const historyToggle = document.getElementById('toggle-history');
+      const historySection = document.querySelector('.history');
+      let currentHistoryBtn = null;
 
       const HISTORY_KEY = 'audio_history';
+      const HISTORY_VISIBLE_KEY = 'history_visible';
 
       // Theme toggle
       function applyTheme(t) {
@@ -165,6 +124,19 @@ INDEX_HTML = """
         localStorage.setItem('theme', next);
       });
 
+      // Toggle de histórico (padrão oculto)
+      function setHistoryVisible(v) {
+        historySection.style.display = v ? 'block' : 'none';
+        historyToggle.textContent = v ? 'Ocultar histórico' : 'Mostrar histórico';
+      }
+      const storedHistoryVisible = localStorage.getItem(HISTORY_VISIBLE_KEY);
+      setHistoryVisible(storedHistoryVisible === 'true');
+      historyToggle.addEventListener('click', () => {
+        const next = historySection.style.display === 'none';
+        setHistoryVisible(next);
+        localStorage.setItem(HISTORY_VISIBLE_KEY, next ? 'true' : 'false');
+      });
+
       function reflectBitrateDisabled() {
         const isMp3 = formatSel.value === 'mp3';
         bitrateInput.disabled = !isMp3;
@@ -173,11 +145,54 @@ INDEX_HTML = """
       reflectBitrateDisabled();
       formatSel.addEventListener('change', reflectBitrateDisabled);
 
+      // Select custom: sincroniza display com select oculto
+      function syncFormatDisplay() {
+        const opt = formatSel.options[formatSel.selectedIndex];
+        formatDisplay.textContent = opt ? opt.text : formatSel.value.toUpperCase();
+      }
+      syncFormatDisplay();
+      formatDisplay.addEventListener('click', () => {
+        formatWrap.classList.toggle('open');
+      });
+      document.querySelectorAll('#format-menu .select-item').forEach(it => {
+        it.addEventListener('click', () => {
+          const val = it.getAttribute('data-val');
+          formatSel.value = val;
+          syncFormatDisplay();
+          formatWrap.classList.remove('open');
+          reflectBitrateDisabled();
+          formatSel.dispatchEvent(new Event('change'));
+        });
+      });
+      document.addEventListener('click', (e) => {
+        if (!formatWrap.contains(e.target)) { formatWrap.classList.remove('open'); }
+      });
+
       document.querySelectorAll('.chip').forEach(c => c.addEventListener('click', () => {
         const url = c.getAttribute('data-url');
         urlInput.value = url;
         urlInput.focus();
       }));
+
+      // Baixar novamente a partir do histórico
+      document.addEventListener('click', (e) => {
+        const hbtn = e.target.closest('.history-download');
+        if (!hbtn) return;
+        const url = hbtn.getAttribute('data-url');
+        const fmt = hbtn.getAttribute('data-format') || 'mp3';
+        if (url) {
+          urlInput.value = url;
+          formatSel.value = fmt;
+          reflectBitrateDisabled();
+          // Estado de loading no botão do histórico e dispara o submit oficial
+          currentHistoryBtn?.classList.remove('loading');
+          currentHistoryBtn?.removeAttribute('disabled');
+          currentHistoryBtn = hbtn;
+          hbtn.classList.add('loading');
+          hbtn.setAttribute('disabled', 'true');
+          document.getElementById('submit-btn').click();
+        }
+      });
 
       function setMessage(text, type='success') {
         msg.textContent = text;
@@ -192,7 +207,7 @@ INDEX_HTML = """
       function addHistory(entry) {
         const list = JSON.parse(localStorage.getItem(HISTORY_KEY) || '[]');
         list.unshift(entry);
-        localStorage.setItem(HISTORY_KEY, JSON.stringify(list.slice(0, 10)));
+        localStorage.setItem(HISTORY_KEY, JSON.stringify(list.slice(0, 5)));
         renderHistory();
       }
 
@@ -200,10 +215,13 @@ INDEX_HTML = """
         const list = JSON.parse(localStorage.getItem(HISTORY_KEY) || '[]');
         const el = document.getElementById('history-list');
         el.innerHTML = '';
-        list.forEach(item => {
+        (list.slice(0, 5)).forEach(item => {
           const div = document.createElement('div');
-          div.className = 'history-item';
-          div.innerHTML = `<div><div><strong>${item.format.toUpperCase()}</strong> • ${item.url}</div><div class="meta">${new Date(item.ts).toLocaleString()}</div></div><div class="meta">${item.status}</div>`;
+          const fmt = (item.format || 'mp3').toLowerCase();
+          div.className = 'history-item format-' + fmt;
+          const badge = `<span class="format-badge format-${fmt}">${fmt.toUpperCase()}</span>`;
+          const dlIcon = '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M12 3v10m0 0l4-4m-4 4l-4-4" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/><path d="M20 21H4" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>';
+          div.innerHTML = `<div><div>${badge} • ${item.url}</div><div class="meta">${new Date(item.ts).toLocaleString()}</div></div><div style="display:flex;align-items:center;gap:8px;"><div class="meta">${item.status}</div><button class="icon-btn history-download" title="Baixar novamente" data-url="${item.url}" data-format="${fmt}">${dlIcon}</button></div>`;
           el.appendChild(div);
         });
       }
@@ -237,6 +255,7 @@ INDEX_HTML = """
           urlInput.focus();
           urlInput.style.borderColor = '#ef4444';
           setMessage('URL inválida. Informe um link do YouTube ou Shorts.', 'error');
+          if (currentHistoryBtn) { currentHistoryBtn.classList.remove('loading'); currentHistoryBtn.removeAttribute('disabled'); currentHistoryBtn = null; }
           return;
         }
 
@@ -267,6 +286,7 @@ INDEX_HTML = """
                 addHistory({ url, format: formatSel.value, ts: Date.now(), status: 'ok' });
                 overlay.style.display = 'none';
                 btn.disabled = false;
+                if (currentHistoryBtn) { currentHistoryBtn.classList.remove('loading'); currentHistoryBtn.removeAttribute('disabled'); currentHistoryBtn = null; }
               } else if (payload.status === 'error') {
                 statusEl.textContent = payload.message || 'Erro.';
                 setMessage(payload.message || 'Erro na conversão.', 'error');
@@ -274,6 +294,7 @@ INDEX_HTML = """
                 addHistory({ url, format: formatSel.value, ts: Date.now(), status: 'erro' });
                 overlay.style.display = 'none';
                 btn.disabled = false;
+                if (currentHistoryBtn) { currentHistoryBtn.classList.remove('loading'); currentHistoryBtn.removeAttribute('disabled'); currentHistoryBtn = null; }
               }
             };
             es.onerror = () => {
@@ -285,6 +306,7 @@ INDEX_HTML = """
           }
         } catch (err) {
           setMessage('Erro de rede. Tente novamente.', 'error');
+          if (currentHistoryBtn) { currentHistoryBtn.classList.remove('loading'); currentHistoryBtn.removeAttribute('disabled'); currentHistoryBtn = null; }
         } finally {
           btn.disabled = false;
           overlay.style.display = 'none';

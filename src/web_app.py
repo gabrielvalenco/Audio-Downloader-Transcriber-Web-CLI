@@ -82,20 +82,23 @@ INDEX_HTML = """
           </div>
         </div>
       </div>
-      <div class="card" style="margin-top:16px;">
+      <div class="card">
         <div class="card-header">
           <h2 class="h1">Record audio</h2>
         </div>
         <div class="card-body">
           <div id="recorder">
-            <div class="row-actions">
-              <button id="rec-start" class="button-secondary">Start recording</button>
-              <button id="rec-stop" class="button-secondary" disabled>Stop</button>
-              <div id="rec-timer" class="examples" style="display:none;">00:00</div>
+            <div class="rec-controls">
+              <button id="rec-start" class="btn">Start recording</button>
+              <div class="rec-right">
+                <div id="rec-timer" class="rec-timer" style="display:none;">00:00</div>
+                <button id="rec-stop" class="button-secondary" style="display:none;">Stop</button>
+              </div>
             </div>
             <audio id="rec-audio" controls style="display:none;margin-top:12px;"></audio>
             <div class="row-actions">
               <button id="rec-download" class="button-secondary" disabled>Download recording</button>
+              <button id="rec-delete" class="button-secondary" disabled>Delete recording</button>
             </div>
             <div class="examples" id="rec-status" style="display:none; margin-top:8px;"></div>
           </div>
@@ -132,6 +135,7 @@ INDEX_HTML = """
       const recTimerEl = document.getElementById('rec-timer');
       const recAudioEl = document.getElementById('rec-audio');
       const recDownloadBtn = document.getElementById('rec-download');
+      const recDeleteBtn = document.getElementById('rec-delete');
       const recStatusEl = document.getElementById('rec-status');
       let recStream = null, mediaRecorder = null, recChunks = [], recBlob = null, recTimer = null, recStartAt = 0, recMime = null;
       let currentHistoryBtn = null;
@@ -187,6 +191,7 @@ INDEX_HTML = """
             recAudioEl.src = url;
             recAudioEl.style.display = 'block';
             recDownloadBtn.disabled = false;
+            recDeleteBtn.disabled = false;
             recStatusEl.textContent = 'Gravação finalizada';
             recStatusEl.style.display = 'block';
           };
@@ -195,7 +200,9 @@ INDEX_HTML = """
           recTimerEl.style.display = 'block';
           updateRecTimer();
           recTimer = setInterval(updateRecTimer, 500);
-          recStartBtn.disabled = true; recStopBtn.disabled = false;
+          recStartBtn.disabled = true; 
+          recStopBtn.style.display = 'inline-block';
+          recStopBtn.disabled = false;
         } catch (err) {
           recStatusEl.textContent = 'Não foi possível acessar o microfone.';
           recStatusEl.style.display = 'block';
@@ -207,7 +214,9 @@ INDEX_HTML = """
         recStream = null;
         clearInterval(recTimer); recTimer = null;
         recTimerEl.style.display = 'none';
-        recStartBtn.disabled = false; recStopBtn.disabled = true;
+        recStartBtn.disabled = false; 
+        recStopBtn.disabled = true; 
+        recStopBtn.style.display = 'none';
       }
       recStartBtn.addEventListener('click', startRecording);
       recStopBtn.addEventListener('click', stopRecording);
@@ -221,6 +230,24 @@ INDEX_HTML = """
         document.body.appendChild(a);
         a.click();
         setTimeout(() => { URL.revokeObjectURL(href); a.remove(); }, 1000);
+        // Registrar no histórico como gravação local
+        addHistory({ url: 'Gravação local', format: 'rec', ts: Date.now(), status: 'salvo' });
+      });
+      recDeleteBtn.addEventListener('click', () => {
+        try { recAudioEl.pause(); } catch {}
+        try { 
+          if (recAudioEl.src && recAudioEl.src.startsWith('blob:')) { 
+            try { URL.revokeObjectURL(recAudioEl.src); } catch {}
+          }
+          recAudioEl.removeAttribute('src'); 
+          recAudioEl.load(); 
+        } catch {}
+        recAudioEl.style.display = 'none';
+        recBlob = null; recChunks = []; recMime = null;
+        recDownloadBtn.disabled = true;
+        recDeleteBtn.disabled = true;
+        recStatusEl.textContent = 'Gravação excluída';
+        recStatusEl.style.display = 'block';
       });
 
       function reflectBitrateDisabled() {
@@ -307,7 +334,10 @@ INDEX_HTML = """
           div.className = 'history-item format-' + fmt;
           const badge = `<span class="format-badge format-${fmt}">${fmt.toUpperCase()}</span>`;
           const dlIcon = '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M12 3v10m0 0l4-4m-4 4l-4-4" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/><path d="M20 21H4" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>';
-          div.innerHTML = `<div><div>${badge} • ${item.url}</div><div class="meta">${new Date(item.ts).toLocaleString()}</div></div><div style="display:flex;align-items:center;gap:8px;"><div class="meta">${item.status}</div><button class="icon-btn history-download" title="Baixar novamente" data-url="${item.url}" data-format="${fmt}">${dlIcon}</button></div>`;
+          const right = (fmt !== 'rec' && isValidYouTubeUrl(item.url))
+            ? `<button class="icon-btn history-download" title="Baixar novamente" data-url="${item.url}" data-format="${fmt}">${dlIcon}</button>`
+            : '';
+          div.innerHTML = `<div><div>${badge} • ${item.url}</div><div class="meta">${new Date(item.ts).toLocaleString()}</div></div><div style="display:flex;align-items:center;gap:8px;"><div class="meta">${item.status}</div>${right}</div>`;
           el.appendChild(div);
         });
       }

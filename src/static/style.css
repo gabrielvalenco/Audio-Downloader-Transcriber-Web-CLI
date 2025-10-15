@@ -56,12 +56,15 @@ input[type=text]:focus, select:focus { border-color: var(--accent); box-shadow: 
 .msg.success { background: rgba(16,185,129,0.12); border-color: rgba(16,185,129,0.35); }
 .msg.error { background: rgba(239,68,68,0.12); border-color: rgba(239,68,68,0.35); }
 .footer { margin-top: 24px; text-align:center; color: var(--muted); font-size: 0.85rem; }
+.footer a { color: var(--text); text-decoration: none; border-bottom: 1px dashed var(--border); }
+.footer a:hover { color: var(--accent); border-bottom-color: var(--accent); }
 .overlay { position:fixed; inset:0; background: rgba(0,0,0,0.35); backdrop-filter: blur(2px); display:none; align-items:center; justify-content:center; z-index: 1000; }
 .spinner { width: 56px; height: 56px; border: 6px solid rgba(255,0,81,0.25); border-top-color: var(--accent); border-radius: 50%; animation: spin 0.85s linear infinite; }
 @keyframes spin { to { transform: rotate(360deg); } }
 .progress { margin-top:16px; height: 14px; background: #0b1220; border:1px solid var(--border); border-radius: 999px; overflow:hidden; }
 .progress > .bar { height:100%; width:0%; background: var(--accent); transition: width .2s ease; }
 .row-actions { display:flex; gap:8px; align-items:center; justify-content:space-between; margin-top:12px; }
+.row-actions .examples { min-width: 80px; text-align: right; }
 .button-secondary { padding: 10px 14px; border-radius: 10px; border: 1px solid var(--border); background: #0b1220; color: var(--text); cursor: pointer; font-weight:500; font-family: 'JetBrains Mono', ui-monospace, SFMono-Regular, Menlo, Consolas, 'Liberation Mono', monospace; }
 .button-secondary:hover { border-color: var(--accent); }
 .history { margin-top:24px; }

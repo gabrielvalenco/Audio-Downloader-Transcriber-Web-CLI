@@ -82,7 +82,26 @@ INDEX_HTML = """
           </div>
         </div>
       </div>
-      <div class="footer">Powered by yt-dlp + FFmpeg</div>
+      <div class="card" style="margin-top:16px;">
+        <div class="card-header">
+          <h2 class="h1">Record audio</h2>
+        </div>
+        <div class="card-body">
+          <div id="recorder">
+            <div class="row-actions">
+              <button id="rec-start" class="button-secondary">Start recording</button>
+              <button id="rec-stop" class="button-secondary" disabled>Stop</button>
+              <div id="rec-timer" class="examples" style="display:none;">00:00</div>
+            </div>
+            <audio id="rec-audio" controls style="display:none;margin-top:12px;"></audio>
+            <div class="row-actions">
+              <button id="rec-download" class="button-secondary" disabled>Download recording</button>
+            </div>
+            <div class="examples" id="rec-status" style="display:none; margin-top:8px;"></div>
+          </div>
+        </div>
+      </div>
+      <div class="footer">Powered by yt-dlp + FFmpeg • <a href="https://github.com/gabrielvalenco" target="_blank" rel="noopener">github.com/gabrielvalenco</a></div>
       <div class="history" style="display:none;">
         <h3>Histórico</h3>
         <div id="history-list" class="history-list"></div>
@@ -107,6 +126,14 @@ INDEX_HTML = """
       const openDownloadsBtn = document.getElementById('open-downloads');
       const historyToggle = document.getElementById('toggle-history');
       const historySection = document.querySelector('.history');
+      // Recorder elements
+      const recStartBtn = document.getElementById('rec-start');
+      const recStopBtn = document.getElementById('rec-stop');
+      const recTimerEl = document.getElementById('rec-timer');
+      const recAudioEl = document.getElementById('rec-audio');
+      const recDownloadBtn = document.getElementById('rec-download');
+      const recStatusEl = document.getElementById('rec-status');
+      let recStream = null, mediaRecorder = null, recChunks = [], recBlob = null, recTimer = null, recStartAt = 0, recMime = null;
       let currentHistoryBtn = null;
 
       const HISTORY_KEY = 'audio_history';
@@ -135,6 +162,65 @@ INDEX_HTML = """
         const next = historySection.style.display === 'none';
         setHistoryVisible(next);
         localStorage.setItem(HISTORY_VISIBLE_KEY, next ? 'true' : 'false');
+      });
+
+      // Gravação de áudio via MediaRecorder
+      function formatTime(ms) {
+        const s = Math.floor(ms/1000); const m = Math.floor(s/60); const r = s % 60;
+        return String(m).padStart(2,'0') + ':' + String(r).padStart(2,'0');
+      }
+      function updateRecTimer() {
+        recTimerEl.textContent = formatTime(Date.now() - recStartAt);
+      }
+      async function startRecording() {
+        recStatusEl.style.display = 'none';
+        try {
+          recStream = await navigator.mediaDevices.getUserMedia({ audio: true });
+          recChunks = []; recBlob = null;
+          const prefer = ['audio/webm;codecs=opus','audio/ogg;codecs=opus','audio/webm'];
+          recMime = prefer.find(t => window.MediaRecorder && MediaRecorder.isTypeSupported && MediaRecorder.isTypeSupported(t)) || undefined;
+          mediaRecorder = new MediaRecorder(recStream, recMime ? { mimeType: recMime } : {});
+          mediaRecorder.ondataavailable = (ev) => { if (ev.data && ev.data.size > 0) recChunks.push(ev.data); };
+          mediaRecorder.onstop = () => {
+            recBlob = new Blob(recChunks, { type: recMime || 'audio/webm' });
+            const url = URL.createObjectURL(recBlob);
+            recAudioEl.src = url;
+            recAudioEl.style.display = 'block';
+            recDownloadBtn.disabled = false;
+            recStatusEl.textContent = 'Gravação finalizada';
+            recStatusEl.style.display = 'block';
+          };
+          mediaRecorder.start();
+          recStartAt = Date.now();
+          recTimerEl.style.display = 'block';
+          updateRecTimer();
+          recTimer = setInterval(updateRecTimer, 500);
+          recStartBtn.disabled = true; recStopBtn.disabled = false;
+        } catch (err) {
+          recStatusEl.textContent = 'Não foi possível acessar o microfone.';
+          recStatusEl.style.display = 'block';
+        }
+      }
+      function stopRecording() {
+        try { mediaRecorder && mediaRecorder.stop(); } catch {}
+        try { recStream && recStream.getTracks().forEach(t => t.stop()); } catch {}
+        recStream = null;
+        clearInterval(recTimer); recTimer = null;
+        recTimerEl.style.display = 'none';
+        recStartBtn.disabled = false; recStopBtn.disabled = true;
+      }
+      recStartBtn.addEventListener('click', startRecording);
+      recStopBtn.addEventListener('click', stopRecording);
+      recDownloadBtn.addEventListener('click', () => {
+        if (!recBlob) return;
+        const a = document.createElement('a');
+        const href = URL.createObjectURL(recBlob);
+        a.href = href;
+        const ext = (recMime && recMime.includes('ogg')) ? 'ogg' : 'webm';
+        a.download = `recording-${new Date().toISOString().slice(0,19).replace(/[:T]/g,'-')}.${ext}`;
+        document.body.appendChild(a);
+        a.click();
+        setTimeout(() => { URL.revokeObjectURL(href); a.remove(); }, 1000);
       });
 
       function reflectBitrateDisabled() {

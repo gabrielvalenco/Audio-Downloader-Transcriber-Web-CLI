@@ -13,6 +13,7 @@ Simple command-line tool to download videos and extract audio as MP3 or M4A usin
 - Python 3.10+ installed.
 - FFmpeg installed and available on your `PATH`.
   - Windows: `winget install Gyan.FFmpeg` or `choco install ffmpeg`
+  - Or install a local copy with `scripts\install_ffmpeg.ps1` and use `--ffmpeg` to point to it.
 
 ## Setup
 ```bash
@@ -58,6 +59,11 @@ python src\\download_audio.py -c "C:\\path\\to\\cookies.txt" "https://url"
 ```
 
 Note: `--format mp4` is supported as an alias for `m4a` (audio inside MP4 containers is typically `m4a`).
+ 
+Use a local FFmpeg without touching system PATH:
+```bash
+python src\\download_audio.py --ffmpeg "tools/ffmpeg/bin" -f mp3 "https://url"
+```
 
 ## Build a standalone executable (Windows)
 ```bash
@@ -73,6 +79,9 @@ scripts\setup.ps1
 
 # Build the executable
 scripts\build.ps1
+ 
+# Install a local FFmpeg (no admin required)
+scripts\install_ffmpeg.ps1
 ```
 
 ## Project Structure
@@ -82,7 +91,8 @@ audio/
 │  └─ download_audio.py
 ├─ scripts/
 │  ├─ setup.ps1
-│  └─ build.ps1
+│  ├─ build.ps1
+│  └─ install_ffmpeg.ps1
 ├─ .gitignore
 ├─ requirements.txt
 └─ README.md

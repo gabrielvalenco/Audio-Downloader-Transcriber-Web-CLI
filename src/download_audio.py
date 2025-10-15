@@ -9,6 +9,22 @@ def has_ffmpeg() -> bool:
     return shutil.which("ffmpeg") is not None
 
 
+def resolve_ffmpeg_location(path: str | None) -> str | None:
+    if not path:
+        return None
+    p = os.path.expandvars(os.path.expanduser(path))
+    if os.path.isfile(p):
+        return p
+    if os.path.isdir(p):
+        cand = os.path.join(p, "ffmpeg.exe") if os.name == "nt" else os.path.join(p, "ffmpeg")
+        if os.path.isfile(cand):
+            return p
+        bin_cand = os.path.join(p, "bin", "ffmpeg.exe") if os.name == "nt" else os.path.join(p, "bin", "ffmpeg")
+        if os.path.isfile(bin_cand):
+            return os.path.join(p, "bin")
+    return None
+
+
 def _format_bytes(num: float) -> str:
     for unit in ["B", "KB", "MB", "GB"]:
         if num < 1024.0:
@@ -53,7 +69,7 @@ def progress_hook(d):
         print("\nDownload finished, extracting/converting audio...")
 
 
-def build_opts(outdir: str, audio_format: str, bitrate: int, no_playlist: bool, outtmpl: str | None, cookiefile: str | None):
+def build_opts(outdir: str, audio_format: str, bitrate: int, no_playlist: bool, outtmpl: str | None, cookiefile: str | None, ffmpeg_location: str | None):
     postprocessors = []
     # Support 'mp4' as an alias for 'm4a' to match user expectation
     if audio_format == "mp4":
@@ -83,6 +99,9 @@ def build_opts(outdir: str, audio_format: str, bitrate: int, no_playlist: bool, 
         "no_warnings": True,
         "progress_hooks": [progress_hook],
     }
+
+    if ffmpeg_location:
+        opts["ffmpeg_location"] = ffmpeg_location
 
     if cookiefile:
         opts["cookiefile"] = cookiefile
@@ -132,12 +151,21 @@ def main():
         default=None,
         help="Path to cookies file for sites requiring login",
     )
+    parser.add_argument(
+        "--ffmpeg",
+        default=None,
+        help="Path to FFmpeg binary or directory containing it (e.g., tools/ffmpeg/bin)",
+    )
 
     args = parser.parse_args()
     os.makedirs(args.output, exist_ok=True)
 
-    if not has_ffmpeg():
-        print("FFmpeg not found on PATH. Install FFmpeg and try again.", file=sys.stderr)
+    ffmpeg_loc = resolve_ffmpeg_location(args.ffmpeg)
+    if args.ffmpeg and not ffmpeg_loc:
+        print("Provided --ffmpeg path is invalid. Set to ffmpeg.exe or its folder.", file=sys.stderr)
+        sys.exit(1)
+    if not args.ffmpeg and not has_ffmpeg():
+        print("FFmpeg not found on PATH. Install FFmpeg or use --ffmpeg.", file=sys.stderr)
         sys.exit(1)
 
     ydl_opts = build_opts(
@@ -147,6 +175,7 @@ def main():
         no_playlist=args.no_playlist,
         outtmpl=args.template,
         cookiefile=args.cookies,
+        ffmpeg_location=ffmpeg_loc,
     )
     try:
         with YoutubeDL(ydl_opts) as ydl:

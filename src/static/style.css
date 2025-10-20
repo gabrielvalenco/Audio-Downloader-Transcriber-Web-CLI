@@ -147,3 +147,26 @@ select.accent-select option:checked { background: var(--accent); color:#fff; }
 
 /* Center Convert submit button */
 #submit-btn { display: block; margin: 16px auto 0; }
+/* Scroll to top button */
+.scroll-top {
+   position: fixed;
+   right: 16px;
+   bottom: 16px;
+   z-index: 1000;
+   display: none; /* será alternado para inline-flex no JS */
+   width: 44px;
+   height: 44px;
+   border-radius: 9999px;
+   padding: 0;
+   box-shadow: 0 4px 12px rgba(0,0,0,0.2);
+   align-items: center;
+   justify-content: center;
+   line-height: 0;
+ }
+ .scroll-top svg {
+   display: block;
+   width: 20px;
+   height: 20px;
+   fill: currentColor;
+ }
+ .scroll-top:hover { transform: translateY(-2px); }

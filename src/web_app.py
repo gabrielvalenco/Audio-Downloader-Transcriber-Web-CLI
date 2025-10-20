@@ -137,6 +137,11 @@ INDEX_HTML = """
         </div>
       </div>
       <div class="footer">Powered by yt-dlp + FFmpeg • <a href="https://github.com/gabrielvalenco" target="_blank" rel="noopener">github.com/gabrielvalenco</a></div>
+<button id="scroll-top" class="btn scroll-top" title="Subir ao topo" aria-label="Subir ao topo">
+  <svg viewBox="0 0 24 24" width="20" height="20" aria-hidden="true" focusable="false">
+    <path d="M12 4l-6 6h4v8h4v-8h4l-6-6z"></path>
+  </svg>
+</button>
       <div class="history" style="display:none;">
         <h3>Histórico</h3>
         <div id="history-list" class="history-list"></div>
@@ -159,6 +164,7 @@ INDEX_HTML = """
       const statusEl = document.getElementById('status');
       const themeToggle = document.getElementById('theme-toggle');
       const openDownloadsBtn = document.getElementById('open-downloads');
+      const scrollTopBtn = document.getElementById('scroll-top');
       const historyToggle = document.getElementById('toggle-history');
        const historySection = document.querySelector('.history');
        // Recorder elements
@@ -526,6 +532,16 @@ INDEX_HTML = """
         if (e.ctrlKey && e.key.toLowerCase() === 'enter') { form.requestSubmit(); }
         if (e.ctrlKey && e.key.toLowerCase() === 'o') { openDownloads(); }
         if (e.ctrlKey && e.key.toLowerCase() === 't') { themeToggle.click(); }
+      });
+
+      window.addEventListener('scroll', () => {
+        const show = window.scrollY > 200;
+        if (scrollTopBtn) {
+          scrollTopBtn.style.display = show ? 'inline-flex' : 'none';
+        }
+      });
+      scrollTopBtn?.addEventListener('click', () => {
+        window.scrollTo({ top: 0, behavior: 'smooth' });
       });
     </script>
   </body>

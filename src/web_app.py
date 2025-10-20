@@ -82,10 +82,10 @@ INDEX_HTML = """
           </form>
           <div id="message" class="msg" style="display:none;"></div>
           <div class="progress" id="progress" style="display:none;"><div class="bar" id="progress-bar"></div></div>
-          <div class="row-actions">
-            <div class="examples" id="status" style="display:none;">Preparando…</div>
+          <div class="examples" id="status" style="display:none;">Preparando…</div>
+          <div class="row-actions" id="downloads-actions" style="margin-top:8px;">
             <button id="open-downloads" class="button-secondary" style="display:none;">Abrir downloads</button>
-            </div>
+          </div>
         </div>
       </div>
       <div class="card">
@@ -208,6 +208,9 @@ INDEX_HTML = """
         const next = historySection.style.display === 'none';
         setHistoryVisible(next);
         localStorage.setItem(HISTORY_VISIBLE_KEY, next ? 'true' : 'false');
+        if (next) {
+          historySection.scrollIntoView({ behavior: 'smooth', block: 'start' });
+        }
       });
 
       // Gravação de áudio via MediaRecorder
@@ -240,6 +243,8 @@ INDEX_HTML = """
             if (useRecordingBtn) { useRecordingBtn.disabled = false; useRecordingBtn.style.display = 'inline-block'; }
             recStatusEl.textContent = 'Gravação finalizada';
             recStatusEl.style.display = 'block';
+            recStatusEl.classList.remove('status-deleted', 'status-saved');
+            recStatusEl.classList.add('status-recorded');
           };
           mediaRecorder.start();
           recStartAt = Date.now();
@@ -278,6 +283,10 @@ INDEX_HTML = """
         setTimeout(() => { URL.revokeObjectURL(href); a.remove(); }, 1000);
         // Registrar no histórico como gravação local
         addHistory({ url: 'Gravação local', format: 'rec', ts: Date.now(), status: 'salvo' });
+        recStatusEl.textContent = 'Gravação salva';
+        recStatusEl.style.display = 'block';
+        recStatusEl.classList.remove('status-recorded', 'status-deleted');
+        recStatusEl.classList.add('status-saved');
       });
       recDeleteBtn.addEventListener('click', () => {
         try { recAudioEl.pause(); } catch {}
@@ -300,6 +309,8 @@ INDEX_HTML = """
         try { window.preferRec = false; } catch {}
         recStatusEl.textContent = 'Gravação excluída';
         recStatusEl.style.display = 'block';
+        recStatusEl.classList.remove('status-recorded', 'status-saved');
+        recStatusEl.classList.add('status-deleted');
       });
 
       function reflectBitrateDisabled() {
@@ -389,93 +400,21 @@ INDEX_HTML = """
           const right = (fmt !== 'rec' && isValidYouTubeUrl(item.url))
             ? `<button class="icon-btn history-download" title="Baixar novamente" data-url="${item.url}" data-format="${fmt}">${dlIcon}</button>`
             : '';
-          div.innerHTML = `<div><div>${badge} • ${item.url}</div><div class="meta">${new Date(item.ts).toLocaleString()}</div></div><div style="display:flex;align-items:center;gap:8px;"><div class="meta">${item.status}</div>${right}</div>`;
+          const result = (item.status || '').toLowerCase();
+          const statusClass = (result === 'ok')
+            ? 'status-ok'
+            : ((result === 'error' || result === 'erro')
+              ? 'status-error'
+              : (result === 'salvo')
+                ? 'status-saved'
+                : '');
+          div.innerHTML = `<div><div>${badge} • ${item.url}</div><div class="meta">${new Date(item.ts).toLocaleString()}</div></div><div style="display:flex;align-items:center;gap:8px;"><div class="meta ${statusClass}">${item.status}</div>${right}</div>`;
           el.appendChild(div);
         });
       }
       renderHistory();
 
-      async function openDownloads() {
-        try {
-          const res = await fetch('/open_downloads', { method: 'POST' });
-          const data = await res.json();
-          if (data.status === 'ok') {
-            setMessage('Abrindo pasta de downloads…', 'success');
-          } else {
-            setMessage(data.message || 'Não foi possível abrir a pasta.', 'error');
-          }
-        } catch (e) {
-          setMessage('Erro ao abrir downloads.', 'error');
-        }
-      }
-      openDownloadsBtn.addEventListener('click', openDownloads);
-
-      // Transcrição com Gemini
-      let preferRec = false;
-      useRecordingBtn?.addEventListener('click', () => {
-        preferRec = true;
-        transStatusEl.textContent = 'Usando última gravação';
-        transStatusEl.style.display = 'block';
-      });
-
-      async function transcribe() {
-        transStatusEl.style.display = 'none';
-        transOutputWrap.style.display = 'none';
-        const fd = new FormData();
-        fd.append('model', 'gemini-2.5-flash');
-        const file = (transFileInput && transFileInput.files && transFileInput.files[0]) ? transFileInput.files[0] : null;
-        if (file) {
-          fd.append('audio', file, file.name || 'audio.wav');
-        } else if (recBlob) {
-          const ext = (recMime && recMime.includes('ogg')) ? 'ogg' : 'webm';
-          fd.append('audio', recBlob, `recording.${ext}`);
-        } else {
-          transStatusEl.textContent = 'Selecione um arquivo ou grave áudio.';
-          transStatusEl.style.display = 'block';
-          return;
-        }
-        transcribeBtn.disabled = true;
-        transcribeBtn.classList.add('loading');
-        try {
-          transStatusEl.textContent = 'Transcrevendo…';
-          transStatusEl.style.display = 'block';
-          const res = await fetch('/transcribe', { method: 'POST', body: fd });
-          const data = await res.json().catch(() => null);
-          if (data && data.status === 'ok') {
-            transOutputEl.textContent = (data.text || '').trim() || '(sem texto)';
-            transOutputWrap.style.display = 'block';
-            transStatusEl.textContent = 'Transcrição concluída';
-          } else {
-            transStatusEl.textContent = (data && data.message) || 'Falha na transcrição.';
-          }
-        } catch (e) {
-          transStatusEl.textContent = 'Erro de rede ao transcrever.';
-        } finally {
-          transcribeBtn.disabled = false;
-          transcribeBtn.classList.remove('loading');
-        }
-      }
-      transcribeBtn?.addEventListener('click', transcribe);
-
-      // Copiar resultado
-      copyTranscriptBtn?.addEventListener('click', async () => {
-        const text = (transOutputEl.textContent || '').trim();
-        if (!text) return;
-        try {
-          await navigator.clipboard.writeText(text);
-          const prev = copyTranscriptBtn.textContent;
-          copyTranscriptBtn.textContent = 'Copiado!';
-          copyTranscriptBtn.classList.add('loading');
-          setTimeout(() => { copyTranscriptBtn.textContent = prev; copyTranscriptBtn.classList.remove('loading'); }, 1200);
-        } catch (err) {
-          // fallback simples
-          try {
-            const ta = document.createElement('textarea'); ta.value = text; document.body.appendChild(ta); ta.select(); document.execCommand('copy'); ta.remove();
-            const prev = copyTranscriptBtn.textContent; copyTranscriptBtn.textContent = 'Copiado!'; setTimeout(() => { copyTranscriptBtn.textContent = prev; }, 1200);
-          } catch {}
-        }
-      });
-
+      // Handler de envio do formulário de conversão
       form.addEventListener('submit', async (e) => {
         e.preventDefault();
         msg.style.display = 'none';
@@ -501,6 +440,8 @@ INDEX_HTML = """
             progress.style.display = 'block';
             statusEl.style.display = 'block';
             statusEl.textContent = 'Iniciando…';
+            statusEl.classList.remove('status-ok', 'status-error');
+            statusEl.classList.add('status-progress');
             const es = new EventSource(`/progress/${data.job_id}`);
             es.onmessage = (ev) => {
               let payload = {}; try { payload = JSON.parse(ev.data); } catch {}
@@ -510,12 +451,19 @@ INDEX_HTML = """
                 const eta = payload.eta ? `${Math.floor(payload.eta/60)}m ${Math.floor(payload.eta%60)}s` : '--';
                 const speed = payload.speed ? (payload.speed/1024/1024).toFixed(2) + ' MB/s' : '--';
                 statusEl.textContent = `Baixando… ${pct.toFixed(1)}% • Velocidade ${speed} • ETA ${eta}`;
+                statusEl.classList.remove('status-ok', 'status-error');
+                statusEl.classList.add('status-progress');
               } else if (payload.status === 'finished' || payload.stage === 'postprocessing') {
                 statusEl.textContent = 'Convertendo áudio…';
+                statusEl.classList.remove('status-ok', 'status-error');
+                statusEl.classList.add('status-progress');
               } else if (payload.status === 'complete') {
                 progressBar.style.width = '100%';
                 statusEl.textContent = (payload.message || 'Concluído!');
+                statusEl.classList.remove('status-error', 'status-progress');
+                statusEl.classList.add('status-ok');
                 setMessage(payload.message || 'Concluído!', 'success');
+                if (openDownloadsBtn) { openDownloadsBtn.style.display = 'inline-block'; }
                 es.close();
                 addHistory({ url, format: formatSel.value, ts: Date.now(), status: 'ok' });
                 overlay.style.display = 'none';
@@ -523,7 +471,10 @@ INDEX_HTML = """
                 if (currentHistoryBtn) { currentHistoryBtn.classList.remove('loading'); currentHistoryBtn.removeAttribute('disabled'); currentHistoryBtn = null; }
               } else if (payload.status === 'error') {
                 statusEl.textContent = payload.message || 'Erro.';
+                statusEl.classList.remove('status-ok', 'status-progress');
+                statusEl.classList.add('status-error');
                 setMessage(payload.message || 'Erro na conversão.', 'error');
+                if (openDownloadsBtn) { openDownloadsBtn.style.display = 'none'; }
                 es.close();
                 addHistory({ url, format: formatSel.value, ts: Date.now(), status: 'erro' });
                 overlay.style.display = 'none';
@@ -546,6 +497,21 @@ INDEX_HTML = """
           overlay.style.display = 'none';
         }
       });
+
+      async function openDownloads() {
+        try {
+          const res = await fetch('/open_downloads', { method: 'POST' });
+          const data = await res.json();
+          if (data.status === 'ok') {
+            setMessage('Abrindo pasta de downloads…', 'success');
+          } else {
+            setMessage(data.message || 'Não foi possível abrir a pasta.', 'error');
+          }
+        } catch (err) {
+          setMessage('Erro ao abrir downloads.', 'error');
+        }
+      }
+      openDownloadsBtn?.addEventListener('click', openDownloads);
 
       // Drag & drop e atalhos
       const card = document.querySelector('.card');

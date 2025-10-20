@@ -73,7 +73,7 @@ input[type=text]:focus, select:focus { border-color: var(--accent); box-shadow: 
 .button-secondary:hover { border-color: var(--accent); }
 .history { margin-top:24px; }
 .history h3 { margin:0 0 12px; font-size:1rem; color: var(--muted); }
-.history-list { display:flex; flex-direction:column; gap:8px; }
+.history-list { display:flex; flex-direction:column; gap:0.75rem; }
 .history-item { padding:10px 12px; border:1px solid var(--border); border-radius:10px; display:flex; align-items:center; gap:8px; justify-content:space-between; }
 .history-item .meta { color: var(--muted); font-size:0.85rem; }
 .toggle { padding:8px 12px; border-radius:999px; border:1px solid var(--border); background:#0b1220; color:var(--text); cursor:pointer; font-weight:500; font-family: 'JetBrains Mono', ui-monospace, SFMono-Regular, Menlo, Consolas, 'Liberation Mono', monospace; }
@@ -130,3 +130,20 @@ select.accent-select option:checked { background: var(--accent); color:#fff; }
 .dropzone.dragover { background: rgba(255,0,81,0.12); box-shadow: 0 0 0 4px rgba(255,0,81,0.22); }
 .dropzone .dz-text { font-size:0.9rem; }
 .theme-light .dropzone { background: rgba(255,0,81,0.07); }
+/* History meta status colors */
+.history-item .meta.status-ok { color: var(--success); }
+.history-item .meta.status-error { color: var(--error); }
+
+/* Recorder status centered and colored */
+#rec-status { text-align: center; }
+#rec-status.status-recorded { color: #f59e0b; }
+#rec-status.status-deleted { color: var(--error); }
+#rec-status.status-saved { color: var(--success); }
+
+/* Convert status colors */
+#status.status-ok { color: var(--success); }
+#status.status-error { color: var(--error); }
+#status.status-progress { color: var(--accent); }
+
+/* Center Convert submit button */
+#submit-btn { display: block; margin: 16px auto 0; }

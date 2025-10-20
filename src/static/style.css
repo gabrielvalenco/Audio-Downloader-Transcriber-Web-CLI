@@ -20,6 +20,16 @@
 body { margin:0; font-family: 'JetBrains Mono', ui-monospace, SFMono-Regular, Menlo, Consolas, 'Liberation Mono', monospace; color: var(--text); background: var(--bg); min-height:100vh; transition: background .25s ease; }
 .container { max-width: 900px; margin: 0 auto; padding: 32px; }
 .header { display:flex; align-items:center; justify-content:space-between; margin-bottom: 24px; gap:12px; }
+.header-left { display:flex; align-items:center; gap:12px; }
+.header-actions { display:flex; align-items:center; gap:8px; }
+
+/* Animated theme toggle (sun/moon) */
+.theme-toggle { width:40px; height:40px; padding:0; display:inline-flex; align-items:center; justify-content:center; position:relative; }
+.theme-toggle svg { position:absolute; transition: transform .25s ease, opacity .25s ease; }
+.theme-toggle .sun { opacity:0; transform: scale(.8) rotate(-15deg); }
+.theme-toggle .moon { opacity:1; transform: scale(1) rotate(0deg); }
+.theme-light .theme-toggle .sun { opacity:1; transform: scale(1) rotate(0deg); }
+.theme-light .theme-toggle .moon { opacity:0; transform: scale(.8) rotate(15deg); }
 .brand { font-weight: 700; letter-spacing: 0.3px; font-size: 1.1rem; color: var(--muted); }
 .card { border: 1px solid var(--border); background: var(--card); margin-bottom: 2rem; border-radius: 16px; overflow: hidden; box-shadow: 0 8px 24px rgba(0,0,0,0.35); }
 .card-header { padding: 20px 24px; border-bottom: 1px solid var(--border); display:flex; align-items:center; gap:12px; }

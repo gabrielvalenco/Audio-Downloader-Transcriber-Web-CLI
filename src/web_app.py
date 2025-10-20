@@ -1,4 +1,4 @@
-from flask import Flask, request, render_template_string, jsonify, Response, redirect
+from flask import Flask, request, render_template_string, jsonify, Response, redirect, send_from_directory
 import os
 import uuid
 import json
@@ -36,10 +36,22 @@ INDEX_HTML = """
   <body>
     <div class="container">
       <div class="header">
-      <div class="brand">Audio Downloader</div>
-      <div class="badge">YouTube → MP3/M4A</div>
-        <button id="theme-toggle" class="toggle" title="Alternar tema">Tema</button>
-        <button id="toggle-history" class="toggle" title="Mostrar histórico">Histórico</button>
+        <div class="header-left">
+          <div class="brand">Audio Downloader</div>
+          <div class="badge">YouTube → MP3/M4A</div>
+        </div>
+        <div class="header-actions">
+          <button id="toggle-history" class="toggle" title="Mostrar histórico">Histórico</button>
+          <button id="theme-toggle" class="toggle theme-toggle" title="Alternar tema" aria-label="Alternar tema">
+            <svg class="moon" viewBox="0 0 24 24" width="20" height="20" aria-hidden="true" focusable="false">
+              <path d="M21 12.79A9 9 0 0111.21 3c-.2 0-.39 0-.58.02a8 8 0 1010.35 10.35c.02-.19.02-.38.02-.58z" fill="currentColor"></path>
+            </svg>
+            <svg class="sun" viewBox="0 0 24 24" width="20" height="20" aria-hidden="true" focusable="false">
+              <path d="M12 4V2m0 20v-2M4 12H2m20 0h-2M5.64 5.64L4.22 4.22m15.56 15.56l-1.42-1.42M18.36 5.64l1.42-1.42M5.64 18.36l-1.42 1.42" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
+              <circle cx="12" cy="12" r="5" fill="currentColor"/>
+            </svg>
+          </button>
+        </div>
       </div>
       <div class="card">
         <div class="card-header">
@@ -765,19 +777,7 @@ def open_downloads():
 
 @app.route("/favicon.svg")
 def favicon_svg():
-    svg = """
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64">
-  <defs>
-    <linearGradient id="g" x1="0" x2="1" y1="0" y2="1">
-      <stop offset="0%" stop-color="#7c3aed"/>
-      <stop offset="100%" stop-color="#22d3ee"/>
-    </linearGradient>
-  </defs>
-  <rect width="64" height="64" rx="14" fill="url(#g)"/>
-  <path d="M24 20v24l20-12z" fill="#fff" opacity="0.9"/>
-</svg>
-"""
-    return Response(svg.strip(), mimetype="image/svg+xml")
+    return send_from_directory(app.static_folder, "favicon.svg", mimetype="image/svg+xml")
 
 
 @app.route("/favicon.ico")

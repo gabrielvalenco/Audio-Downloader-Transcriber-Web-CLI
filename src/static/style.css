@@ -180,3 +180,16 @@ select.accent-select option:checked { background: var(--accent); color:#fff; }
    fill: currentColor;
  }
  .scroll-top:hover { transform: translateY(-2px); }
+.history-item { word-break: break-word; overflow-wrap: anywhere; }
+.history-item > div:first-child { flex: 1 1 auto; min-width: 0; }
+.history-item > div:last-child { flex: 0 0 auto; }
+@media (max-width: 640px) {
+  .history-item { flex-direction: column; align-items: flex-start; gap: 6px; }
+  .history-item > div:last-child { width: 100%; justify-content: space-between; }
+  .scroll-top { right: calc(12px + env(safe-area-inset-right, 0px)); bottom: calc(12px + env(safe-area-inset-bottom, 0px)); }
+}
+@media (max-width: 640px) {
+  .header { flex-direction: column; align-items: flex-start; gap: 8px; }
+  .header-left { width: 100%; }
+  .header-actions { width: 100%; justify-content: flex-start; margin-top: 4px; }
+}

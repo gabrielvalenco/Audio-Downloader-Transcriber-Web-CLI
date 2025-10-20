@@ -135,6 +135,7 @@ INDEX_HTML = """
             </div>
             <div class="row-actions" style="margin-top:12px;">
               <button id="use-recording" class="button-secondary" style="display:none;" disabled>Usar última gravação</button>
+              <button id="clear-trans-file" class="button-secondary" type="button" title="Excluir arquivo" style="display:none;">Excluir arquivo</button>
               <button id="transcribe-btn" class="btn">Transcrever</button>
             </div>
             <div class="examples" id="trans-status" style="display:none; margin-top:8px;"></div>
@@ -195,8 +196,174 @@ INDEX_HTML = """
         const transOutputWrap = document.getElementById('trans-output-wrap');
         const transOutputEl = document.getElementById('trans-output');
         const copyTranscriptBtn = document.getElementById('copy-transcript');
-       let recStream = null, mediaRecorder = null, recChunks = [], recBlob = null, recTimer = null, recStartAt = 0, recMime = null;
-       let currentHistoryBtn = null;
+        const transDropzone = document.getElementById('trans-dropzone');
+        const transDzText = transDropzone ? transDropzone.querySelector('.dz-text') : null;
+        const clearTransFileBtn = document.getElementById('clear-trans-file');
+        // Etapas melhoradas para o loading de transcrição
+        const TRANS_STEPS = [
+          'Preparando áudio…',
+          'Validando formato e tamanho…',
+          'Enviando arquivo para o agente…',
+          'Analisando conteúdo…',
+          'Detectando idioma…',
+          'Transcrevendo fala…',
+          'Refinando pontuação…'
+        ];
+        let recStream = null, mediaRecorder = null, recChunks = [], recBlob = null, recTimer = null, recStartAt = 0, recMime = null;
+        let currentHistoryBtn = null;
+        let transLoadingTimers = [];
+        let transActiveIdx = 0;
+        let transDone = [];
+
+       // ---- Drag & Drop para transcrição ----
+       function setTransFileFromFile(file) {
+         try {
+           const dt = new DataTransfer();
+           dt.items.add(file);
+           transFileInput.files = dt.files;
+         } catch (_) {
+           // Alguns navegadores não permitem setar programaticamente. Usuário pode clicar.
+         }
+         if (transDzText && file) { transDzText.textContent = file.name || 'Arquivo selecionado'; }
+       }
+
+       transDropzone?.addEventListener('click', () => { transFileInput?.click(); });
+       transDropzone?.addEventListener('keydown', (e) => {
+         if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); transFileInput?.click(); }
+       });
+       transDropzone?.addEventListener('dragenter', (e) => { e.preventDefault(); e.stopPropagation(); transDropzone.classList.add('dragover'); });
+       transDropzone?.addEventListener('dragover', (e) => { e.preventDefault(); e.stopPropagation(); transDropzone.classList.add('dragover'); });
+       transDropzone?.addEventListener('dragleave', () => { transDropzone.classList.remove('dragover'); });
+       transDropzone?.addEventListener('drop', (e) => {
+         e.preventDefault(); e.stopPropagation(); transDropzone.classList.remove('dragover');
+         const files = e.dataTransfer?.files;
+         if (files && files.length) {
+           const f = files[0];
+           setTransFileFromFile(f);
+         }
+       });
+       transFileInput?.addEventListener('change', () => {
+         const f = transFileInput.files && transFileInput.files[0];
+         if (f) { if (transDzText) transDzText.textContent = f.name; }
+       });
+
+       clearTransFileBtn?.addEventListener('click', () => {
+         try { transFileInput.value = ''; } catch {}
+         try { transFileInput.files = new DataTransfer().files; } catch {}
+         if (transDzText) transDzText.textContent = 'Arraste e solte um áudio aqui ou clique para escolher';
+         transStatusEl.style.display = 'none';
+         transOutputWrap.style.display = 'none';
+       });
+
+       useRecordingBtn?.addEventListener('click', () => {
+         if (!recBlob) { transStatusEl.textContent = 'Nenhuma gravação disponível.'; transStatusEl.style.display = 'block'; return; }
+         const file = new File([recBlob], 'recording.webm', { type: recMime || 'audio/webm' });
+         setTransFileFromFile(file);
+       });
+
+       // Loading fictício para transcrição
+       function renderTransSteps() {
+         const html = ['<ul class="trans-steps">'];
+         for (let i = 0; i < TRANS_STEPS.length; i++) {
+           const isDone = !!transDone[i];
+           const isActive = i === transActiveIdx && !isDone;
+           const cls = ['trans-step', isActive ? 'active' : '', isDone ? 'done' : ''].filter(Boolean).join(' ');
+           const icon = isDone ? '<span class="step-check">✓</span>' : (isActive ? '<span class="spinner-mini"></span>' : '<span class="step-dot">•</span>');
+           html.push(`<li class="${cls}">${icon} ${TRANS_STEPS[i]}</li>`);
+         }
+         html.push('</ul>');
+         transStatusEl.innerHTML = html.join('');
+       }
+       function renderTransStepsAllDone(finalText) {
+         for (let i = 0; i < TRANS_STEPS.length; i++) transDone[i] = true;
+         transActiveIdx = TRANS_STEPS.length - 1;
+         const html = ['<ul class="trans-steps">'];
+         for (let i = 0; i < TRANS_STEPS.length; i++) {
+           html.push(`<li class="trans-step done"><span class="step-check">✓</span> ${TRANS_STEPS[i]}</li>`);
+         }
+         html.push('</ul>');
+         if (finalText) html.push(`<div class="final-line">${finalText}</div>`);
+         transStatusEl.innerHTML = html.join('');
+       }
+       function renderTransStepsError(errorText) {
+         const html = ['<ul class="trans-steps">'];
+         for (let i = 0; i < TRANS_STEPS.length; i++) {
+           if (i < transActiveIdx) {
+             html.push(`<li class="trans-step done"><span class="step-check">✓</span> ${TRANS_STEPS[i]}</li>`);
+           } else if (i === transActiveIdx) {
+             html.push(`<li class="trans-step error"><span class="step-dot">•</span> ${TRANS_STEPS[i]}</li>`);
+           } else {
+             html.push(`<li class="trans-step"><span class="step-dot">•</span> ${TRANS_STEPS[i]}</li>`);
+           }
+         }
+         html.push('</ul>');
+         if (errorText) html.push(`<div class="final-line">${errorText}</div>`);
+         transStatusEl.innerHTML = html.join('');
+       }
+       function startTransLoading() {
+         transLoadingTimers.forEach(id => clearTimeout(id));
+         transLoadingTimers = [];
+         transStatusEl.style.display = 'block';
+         transStatusEl.classList.remove('status-ok', 'status-error', 'status-progress');
+         transStatusEl.classList.add('status-progress');
+         transActiveIdx = 0;
+         transDone = Array(TRANS_STEPS.length).fill(false);
+         renderTransSteps();
+         // Avança sequencialmente pelas primeiras etapas, depois mantém em "Transcrevendo fala…"
+         const durations = [700, 800, 900, 900, 900]; // soma cumulativa para agendamento
+         let acc = 0;
+         for (let k = 0; k < 4; k++) { // avança do passo 0 ao 4 rapidamente
+           acc += durations[k];
+           transLoadingTimers.push(setTimeout(() => {
+             transDone[transActiveIdx] = true;
+             transActiveIdx = Math.min(transActiveIdx + 1, 5); // manter em "Transcrevendo fala…" (índice 5)
+             renderTransSteps();
+           }, acc));
+         }
+       }
+       function stopTransLoading() {
+         transLoadingTimers.forEach(id => clearTimeout(id));
+         transLoadingTimers = [];
+       }
+
+       async function submitTranscription() {
+         transOutputWrap.style.display = 'none';
+         startTransLoading();
+         try {
+           let file = transFileInput.files && transFileInput.files[0];
+           if (!file && recBlob) { file = new File([recBlob], 'recording.webm', { type: recMime || 'audio/webm' }); }
+           if (!file) { 
+             stopTransLoading();
+             transStatusEl.classList.remove('status-progress');
+             transStatusEl.classList.add('status-error');
+             renderTransStepsError('Selecione ou arraste um arquivo de áudio.');
+             return; 
+           }
+           const fd = new FormData();
+           fd.append('audio', file);
+           const res = await fetch('/transcribe', { method: 'POST', body: fd, headers: { 'X-Requested-With': 'fetch' }});
+           const data = await res.json().catch(() => null);
+           if (data && data.status === 'ok') {
+             stopTransLoading();
+             transOutputEl.textContent = data.text || '';
+             transOutputWrap.style.display = 'block';
+             transStatusEl.classList.remove('status-progress');
+             transStatusEl.classList.add('status-ok');
+             renderTransStepsAllDone('Transcrição concluída');
+           } else {
+             stopTransLoading();
+             transStatusEl.classList.remove('status-progress');
+             transStatusEl.classList.add('status-error');
+             renderTransStepsError((data && data.message) || 'Falha na transcrição.');
+           }
+         } catch (_) {
+           stopTransLoading();
+           transStatusEl.classList.remove('status-progress');
+           transStatusEl.classList.add('status-error');
+           renderTransStepsError('Erro ao enviar áudio.');
+         }
+       }
+       transcribeBtn?.addEventListener('click', submitTranscription);
 
       const HISTORY_KEY = 'audio_history';
       const HISTORY_VISIBLE_KEY = 'history_visible';

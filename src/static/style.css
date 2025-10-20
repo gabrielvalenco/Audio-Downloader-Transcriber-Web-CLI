@@ -151,9 +151,9 @@ select.accent-select option:checked { background: var(--accent); color:#fff; }
 #rec-status.status-saved { color: var(--success); }
 
 /* Convert status colors */
-#status.status-ok { color: var(--success); }
-#status.status-error { color: var(--error); }
-#status.status-progress { color: var(--accent); }
+.examples.status-error { color: var(--error); }
+.examples.status-ok { color: var(--success); }
+.examples.status-progress { color: var(--accent); }
 
 /* Center Convert submit button */
 #submit-btn { display: block; margin: 16px auto 0; }
@@ -193,3 +193,13 @@ select.accent-select option:checked { background: var(--accent); color:#fff; }
   .header-left { width: 100%; }
   .header-actions { width: 100%; justify-content: flex-start; margin-top: 4px; }
 }
+.spinner-mini { width:16px; height:16px; border:2px solid rgba(255,0,81,0.25); border-top-color: var(--accent); border-radius:50%; animation: spin 0.85s linear infinite; display:inline-block; vertical-align: -3px; margin-right:8px; }
+
+.trans-steps { list-style: none; padding: 0; margin: 0; }
+.trans-step { display: flex; align-items: center; gap: 8px; margin: 2px 0; }
+.trans-step .step-check { color: var(--success); font-weight: 700; }
+.trans-step .step-dot { color: var(--muted); font-weight: 700; }
+.trans-step.active { color: var(--accent); }
+.trans-step.done { color: var(--success); }
+.trans-step.error { color: var(--error); }
+.examples .final-line { margin-top: 6px; }

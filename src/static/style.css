@@ -63,9 +63,9 @@ input[type=text]:focus, select:focus { border-color: var(--accent); box-shadow: 
 @keyframes spin { to { transform: rotate(360deg); } }
 .progress { margin-top:16px; height: 14px; background: #0b1220; border:1px solid var(--border); border-radius: 999px; overflow:hidden; }
 .progress > .bar { height:100%; width:0%; background: var(--accent); transition: width .2s ease; }
-.row-actions { display:flex; gap:8px; align-items:center; justify-content:space-between; margin-top:12px; }
+.row-actions { display:flex; gap:8px; align-items:center; justify-content:center; margin-top:12px; }
 .row-actions .examples { min-width: 80px; text-align: right; }
-.rec-controls { display:flex; align-items:center; justify-content:space-between; gap:16px; margin-top:12px; }
+.rec-controls { display:flex; align-items:center; justify-content:center; gap:16px; margin-top:12px; }
 .rec-right { display:flex; align-items:center; gap:12px; }
 .rec-timer { font-weight:600; color: var(--muted); min-width: 64px; text-align: right; }
 .card-body #recorder audio { width:100%; }
@@ -123,3 +123,10 @@ select.accent-select option:hover { background: var(--accent); color:#fff; }
 select.accent-select option:checked { background: var(--accent); color:#fff; }
 .theme-light select.accent-select option { background:#ffffff; color: var(--text); }
 .theme-light .format-rec { background: rgba(255,0,81,0.12); color:#FF0051; border-color: rgba(255,0,81,0.3); }
+
+/* Dropzone for transcription file */
+.dropzone { margin-top:1rem; padding:18px; border:2px dashed var(--accent); border-radius:12px; background: rgba(255,0,81,0.06); color: var(--muted); display:flex; align-items:center; justify-content:center; cursor:pointer; text-align:center; transition: border-color .2s ease, background .2s ease, box-shadow .2s ease; }
+.dropzone:hover { box-shadow: 0 0 0 4px rgba(255,0,81,0.15); }
+.dropzone.dragover { background: rgba(255,0,81,0.12); box-shadow: 0 0 0 4px rgba(255,0,81,0.22); }
+.dropzone .dz-text { font-size:0.9rem; }
+.theme-light .dropzone { background: rgba(255,0,81,0.07); }

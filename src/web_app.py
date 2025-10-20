@@ -84,8 +84,8 @@ INDEX_HTML = """
           <div class="progress" id="progress" style="display:none;"><div class="bar" id="progress-bar"></div></div>
           <div class="row-actions">
             <div class="examples" id="status" style="display:none;">Preparando…</div>
-            <button id="open-downloads" class="button-secondary">Abrir downloads</button>
-          </div>
+            <button id="open-downloads" class="button-secondary" style="display:none;">Abrir downloads</button>
+            </div>
         </div>
       </div>
       <div class="card">
@@ -103,8 +103,8 @@ INDEX_HTML = """
             </div>
             <audio id="rec-audio" controls style="display:none;margin-top:12px;"></audio>
             <div class="row-actions">
-              <button id="rec-download" class="button-secondary" disabled>Download recording</button>
-              <button id="rec-delete" class="button-secondary" disabled>Delete recording</button>
+              <button id="rec-download" class="button-secondary" style="display:none;" disabled>Download recording</button>
+              <button id="rec-delete" class="button-secondary" style="display:none;" disabled>Delete recording</button>
             </div>
             <div class="examples" id="rec-status" style="display:none; margin-top:8px;"></div>
           </div>
@@ -117,9 +117,12 @@ INDEX_HTML = """
         <div class="card-body">
             <div id="transcribe">
             <label for="trans-file" style="margin-top:12px;">Audio file</label>
-            <input type="file" id="trans-file" accept="audio/*" />
+            <div id="trans-dropzone" class="dropzone" tabindex="0" role="button" aria-label="Select or drop audio file">
+              <div class="dz-text">Arraste e solte um áudio aqui ou clique para escolher</div>
+              <input type="file" id="trans-file" accept="audio/*" style="display:none;" />
+            </div>
             <div class="row-actions" style="margin-top:12px;">
-              <button id="use-recording" class="button-secondary" disabled>Usar última gravação</button>
+              <button id="use-recording" class="button-secondary" style="display:none;" disabled>Usar última gravação</button>
               <button id="transcribe-btn" class="btn">Transcrever</button>
             </div>
             <div class="examples" id="trans-status" style="display:none; margin-top:8px;"></div>
@@ -230,11 +233,14 @@ INDEX_HTML = """
             recAudioEl.src = url;
             recAudioEl.style.display = 'block';
             recDownloadBtn.disabled = false;
-           recDeleteBtn.disabled = false;
-           if (useRecordingBtn) { useRecordingBtn.disabled = false; }
-           recStatusEl.textContent = 'Gravação finalizada';
-           recStatusEl.style.display = 'block';
-         };
+            recDeleteBtn.disabled = false;
+            if (recDownloadBtn) { recDownloadBtn.style.display = 'inline-block'; }
+            if (recDeleteBtn) { recDeleteBtn.style.display = 'inline-block'; }
+            if (openDownloadsBtn) { openDownloadsBtn.style.display = 'inline-block'; }
+            if (useRecordingBtn) { useRecordingBtn.disabled = false; useRecordingBtn.style.display = 'inline-block'; }
+            recStatusEl.textContent = 'Gravação finalizada';
+            recStatusEl.style.display = 'block';
+          };
           mediaRecorder.start();
           recStartAt = Date.now();
           recTimerEl.style.display = 'block';
@@ -286,7 +292,10 @@ INDEX_HTML = """
         recBlob = null; recChunks = []; recMime = null;
         recDownloadBtn.disabled = true;
         recDeleteBtn.disabled = true;
-        if (useRecordingBtn) { useRecordingBtn.disabled = true; }
+        if (recDownloadBtn) { recDownloadBtn.style.display = 'none'; }
+        if (recDeleteBtn) { recDeleteBtn.style.display = 'none'; }
+        if (openDownloadsBtn) { openDownloadsBtn.style.display = 'none'; }
+        if (useRecordingBtn) { useRecordingBtn.disabled = true; useRecordingBtn.style.display = 'none'; }
         // se estava preferindo gravação, limpar indicação
         try { window.preferRec = false; } catch {}
         recStatusEl.textContent = 'Gravação excluída';

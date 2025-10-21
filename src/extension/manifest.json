@@ -3,8 +3,15 @@
   "name": "Audio Downloader Helper",
   "version": "0.1.0",
   "description": "Extensão para abrir o app local e baixar áudio de vídeos do YouTube informando apenas a URL.",
+  "icons": {
+    "16": "favicon.svg",
+    "32": "favicon.svg",
+    "48": "favicon.svg",
+    "128": "favicon.svg"
+  },
   "action": {
-    "default_popup": "popup.html"
+    "default_popup": "popup.html",
+    "default_icon": "favicon.svg"
   },
   "permissions": [
     "tabs"

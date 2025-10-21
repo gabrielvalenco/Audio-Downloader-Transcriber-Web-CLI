@@ -31,6 +31,27 @@ python src/web_app.py
 ```
 Open `http://localhost:5000/`, paste a video URL, choose `mp3` or `m4a/mp4`, and optionally set MP3 bitrate or a custom FFmpeg path.
 
+## Browser Extension (Chrome/Edge)
+
+A simple extension (Manifest V3) is available in `src/extension/` to open the local app with the video URL pre-filled and start conversion automatically.
+
+### How to install (developer mode)
+1. Enable developer mode in `chrome://extensions` (or `edge://extensions`).
+2. Click "Load unpacked" and select the folder `src/extension`.
+3. Keep the server running (`python src/web_app.py`).
+4. Click the extension icon:
+   - Paste the YouTube URL or click "Use current" to grab the active tab URL.
+   - Choose the format (MP3 or M4A).
+   - Click "Download". The extension will open `http://127.0.0.1:5000` with URL parameters and the app will start automatically.
+
+### Tip
+You can also open the app manually with parameters:
+```
+http://127.0.0.1:5000/?url=<VIDEO_URL>&format=mp3&submit=1
+```
+
+Note: By default the app focuses on extracting audio. If you need to download video (MP4), the backend can be extended to support that flow.
+
 ## Docker (recommended for a consistent setup)
 ### Using Docker Compose
 1) Optionally create a `.env` file with:

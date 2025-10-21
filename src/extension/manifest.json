@@ -1,0 +1,16 @@
+{
+  "manifest_version": 3,
+  "name": "Audio Downloader Helper",
+  "version": "0.1.0",
+  "description": "Extensão para abrir o app local e baixar áudio de vídeos do YouTube informando apenas a URL.",
+  "action": {
+    "default_popup": "popup.html"
+  },
+  "permissions": [
+    "tabs"
+  ],
+  "host_permissions": [
+    "http://127.0.0.1:5000/*",
+    "http://localhost:5000/*"
+  ]
+}

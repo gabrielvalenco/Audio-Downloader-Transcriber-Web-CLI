@@ -599,6 +599,25 @@ INDEX_HTML = """
       }
       renderHistory();
 
+      // Pré-preencher via parâmetros de URL e enviar automaticamente
+      try {
+        const params = new URLSearchParams(window.location.search);
+        const qUrl = params.get('url');
+        const qFormat = params.get('format');
+        const qSubmit = params.get('submit');
+        if (qUrl) {
+          urlInput.value = qUrl;
+          if (qFormat) {
+            formatSel.value = qFormat.toLowerCase();
+            if (typeof reflectBitrateDisabled === 'function') { reflectBitrateDisabled(); }
+            if (typeof syncFormatDisplay === 'function') { syncFormatDisplay(); }
+          }
+          if (qSubmit && (qSubmit === '1' || qSubmit.toLowerCase() === 'true')) {
+            document.getElementById('submit-btn').click();
+          }
+        }
+      } catch (_) {}
+
       // Handler de envio do formulário de conversão
       form.addEventListener('submit', async (e) => {
         e.preventDefault();

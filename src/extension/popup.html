@@ -1,0 +1,45 @@
+<!doctype html>
+<html lang="pt-BR">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Audio Downloader</title>
+    <style>
+      body { font-family: system-ui, Arial, sans-serif; margin: 0; padding: 12px; width: 320px; }
+      h1 { font-size: 16px; margin: 0 0 12px; }
+      label { display:block; font-size: 12px; color:#374151; margin-bottom:4px; }
+      input[type="text"], select { width: 100%; padding: 8px; border: 1px solid #d1d5db; border-radius: 6px; font-size: 14px; }
+      .row { display: grid; grid-template-columns: 1fr auto; gap: 8px; align-items: end; }
+      .btn { background: #111827; color: white; border: none; border-radius: 6px; padding: 8px 12px; font-size: 14px; cursor: pointer; }
+      .btn.secondary { background: #374151; }
+      .meta { font-size: 12px; color: #6b7280; margin-top: 8px; }
+    </style>
+  </head>
+  <body>
+    <h1>Audio Downloader</h1>
+    <div>
+      <label for="url">URL do vídeo</label>
+      <div class="row">
+        <input type="text" id="url" placeholder="Cole a URL do YouTube" />
+        <button id="use-current" class="btn secondary" title="Usar URL da aba atual">Usar atual</button>
+      </div>
+    </div>
+    <div style="margin-top:8px;">
+      <label for="format">Formato</label>
+      <select id="format">
+        <option value="mp3" selected>MP3</option>
+        <option value="m4a">M4A</option>
+      </select>
+    </div>
+    <div style="margin-top:8px;">
+      <label for="server">Servidor</label>
+      <input type="text" id="server" value="http://127.0.0.1:5000" />
+      <div class="meta">Dica: deixe o app rodando em <code>127.0.0.1:5000</code>.</div>
+    </div>
+    <div style="margin-top:12px;">
+      <button id="download" class="btn">Baixar</button>
+    </div>
+
+    <script src="popup.js"></script>
+  </body>
+</html>

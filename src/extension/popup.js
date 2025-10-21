@@ -106,3 +106,33 @@ downloadBtn?.addEventListener('click', async () => {
   const target = `${server}/?url=${encodeURIComponent(url)}&format=${encodeURIComponent(fmt)}&submit=1`;
   chrome.tabs.create({ url: target });
 });
+
+// Tema: aplicar, alternar e persistir (igual ao app web)
+function applyTheme(theme) {
+  if (theme === 'light') {
+    document.body.classList.add('theme-light');
+  } else {
+    document.body.classList.remove('theme-light');
+  }
+}
+
+const themeToggle = document.getElementById('theme-toggle');
+(function initTheme() {
+  try {
+    const saved = localStorage.getItem('theme');
+    const theme = saved === 'light' ? 'light' : 'dark';
+    applyTheme(theme);
+    if (themeToggle) themeToggle.setAttribute('aria-pressed', String(theme === 'light'));
+  } catch (_) {
+    applyTheme('dark');
+    if (themeToggle) themeToggle.setAttribute('aria-pressed', 'false');
+  }
+})();
+
+themeToggle?.addEventListener('click', () => {
+  const isLight = document.body.classList.contains('theme-light');
+  const next = isLight ? 'dark' : 'light';
+  applyTheme(next);
+  try { localStorage.setItem('theme', next); } catch (_) {}
+  themeToggle.setAttribute('aria-pressed', String(next === 'light'));
+});

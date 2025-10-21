@@ -3,6 +3,7 @@ const fmtSelect = document.getElementById('format');
 const serverInput = document.getElementById('server');
 const useCurrentBtn = document.getElementById('use-current');
 const downloadBtn = document.getElementById('download');
+const openWebBtn = document.getElementById('open-web');
 
 // Oculta o campo de servidor por padrão (mantém no DOM para uso avançado)
 const serverRow = document.getElementById('server-row');
@@ -81,6 +82,17 @@ useCurrentBtn?.addEventListener('click', async () => {
   } catch (e) {
     console.warn('Falha ao obter aba atual:', e);
   }
+});
+
+// Abrir o projeto web (home)
+openWebBtn?.addEventListener('click', async () => {
+  let server = (serverInput?.value || '').trim().replace(/\/$/, '');
+  if (!server) {
+    server = (await getStoredServer()) || await autoDetectServer().catch(() => 'http://127.0.0.1:5000');
+  }
+  server = (server || 'http://127.0.0.1:5000').replace(/\/$/, '');
+  await setStoredServer(server);
+  chrome.tabs.create({ url: `${server}/` });
 });
 
 // Fluxo de abrir o app já com submit=1

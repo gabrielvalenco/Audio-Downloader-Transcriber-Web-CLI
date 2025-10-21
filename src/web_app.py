@@ -613,7 +613,14 @@ INDEX_HTML = """
             if (typeof syncFormatDisplay === 'function') { syncFormatDisplay(); }
           }
           if (qSubmit && (qSubmit === '1' || qSubmit.toLowerCase() === 'true')) {
-            document.getElementById('submit-btn').click();
+            // Agendar após registrar listeners do formulário para evitar envio padrão
+            setTimeout(() => {
+              if (typeof form.requestSubmit === 'function') {
+                form.requestSubmit();
+              } else {
+                document.getElementById('submit-btn').click();
+              }
+            }, 0);
           }
         }
       } catch (_) {}

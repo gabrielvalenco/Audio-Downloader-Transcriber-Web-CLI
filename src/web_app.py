@@ -1,5 +1,10 @@
 from flask import Flask, request, render_template_string, jsonify, Response, redirect, send_from_directory
 import os
+import sys
+
+# Ensure current directory is in path for imports
+sys.path.append(os.path.dirname(os.path.abspath(__file__)))
+
 from dotenv import load_dotenv
 load_dotenv()
 import uuid

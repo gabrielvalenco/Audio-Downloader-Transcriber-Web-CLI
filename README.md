@@ -1,5 +1,4 @@
-# Audio Downloader & Transcriber (Web + CLI)
-
+# VoxHub
 Download audio from videos via `yt-dlp` + `FFmpeg`, record audio in-browser, and transcribe files/recordings using an AI transcription model. Includes a simple Web UI, CLI, and Docker support for streamlined setup.
 
 ## Highlights

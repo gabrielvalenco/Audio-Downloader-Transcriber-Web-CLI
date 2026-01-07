@@ -771,7 +771,8 @@ def download():
     except ValueError:
         bitrate = 320
 
-    outdir = "downloads"
+    is_vercel = os.environ.get("VERCEL") == "1"
+    outdir = "/tmp/downloads" if is_vercel else "downloads"
     os.makedirs(outdir, exist_ok=True)
 
     ffmpeg_loc = resolve_ffmpeg_location(ffmpeg_path) if ffmpeg_path else None
@@ -803,7 +804,9 @@ def download():
         auto_bin = find_local_ffmpeg_bin()
         if auto_bin:
             ffmpeg_loc = auto_bin
-        else:
+        elif not is_vercel:
+            # On Vercel, we might not have ffmpeg, but we proceed to try (some formats might work)
+            # or we fail later.
             msg = "FFmpeg not found. Install it (winget/choco) or run scripts\\install_ffmpeg.ps1 and set tools\\ffmpeg\\bin above."
             return (jsonify({"status": "error", "message": msg}) if is_fetch else render_template_string(INDEX_HTML, message=msg))
 
@@ -820,42 +823,20 @@ def download():
     # Job manager and SSE progress
     job_id = uuid.uuid4().hex
     q = queue.Queue()
-    jobs[job_id] = {"queue": q, "status": "running", "outdir": outdir, "message": ""}
+    # Store necessary info to run the job later (in /progress)
+    jobs[job_id] = {
+        "queue": q,
+        "status": "pending",
+        "outdir": outdir,
+        "message": "",
+        "url": url,
+        "ydl_opts": ydl_opts
+    }
 
-    def run_job(job_id: str, url: str, opts: dict, job: dict):
-        def hook(d):
-            status = d.get("status")
-            ev = {"status": status}
-            if status == "downloading":
-                total = d.get("total_bytes") or d.get("total_bytes_estimate") or 0
-                downloaded = d.get("downloaded_bytes", 0) or 0
-                ev["total"] = int(total)
-                ev["downloaded"] = int(downloaded)
-                ev["pct"] = (downloaded / total * 100) if total else 0.0
-                ev["eta"] = d.get("eta")
-                ev["speed"] = d.get("speed") or 0
-            elif status == "finished":
-                ev["stage"] = "postprocessing"
-                ev["filename"] = d.get("filename")
-            job["queue"].put(ev)
-
-        job_opts = dict(opts)
-        job_opts["progress_hooks"] = [hook]  # override hooks for SSE
-        try:
-            with YoutubeDL(job_opts) as ydl:
-                ydl.download([url])
-            job["status"] = "done"
-            job["message"] = f"Done! Files saved to: {os.path.abspath(job['outdir'])}"
-            job["queue"].put({"status": "complete", "message": job["message"]})
-        except Exception as e:
-            job["status"] = "error"
-            job["message"] = f"Error: {e}"
-            job["queue"].put({"status": "error", "message": job["message"]})
-        finally:
-            job["queue"].put(None)
-
-    threading.Thread(target=run_job, args=(job_id, url, ydl_opts, jobs[job_id]), daemon=True).start()
-
+    # On Vercel (or generally to avoid freezing), we start the thread when the client connects to SSE.
+    # However, for local dev, starting immediately is fine. 
+    # To be consistent, we will defer execution to the /progress endpoint.
+    
     return jsonify({"status": "ok", "job_id": job_id, "outdir": os.path.abspath(outdir)})
 
 
@@ -935,6 +916,44 @@ def progress(job_id: str):
 
     q: queue.Queue = job["queue"]
 
+    # Define the worker function
+    def run_job(job_id: str, url: str, opts: dict, job: dict):
+        def hook(d):
+            status = d.get("status")
+            ev = {"status": status}
+            if status == "downloading":
+                total = d.get("total_bytes") or d.get("total_bytes_estimate") or 0
+                downloaded = d.get("downloaded_bytes", 0) or 0
+                ev["total"] = int(total)
+                ev["downloaded"] = int(downloaded)
+                ev["pct"] = (downloaded / total * 100) if total else 0.0
+                ev["eta"] = d.get("eta")
+                ev["speed"] = d.get("speed") or 0
+            elif status == "finished":
+                ev["stage"] = "postprocessing"
+                ev["filename"] = d.get("filename")
+            job["queue"].put(ev)
+
+        job_opts = dict(opts)
+        job_opts["progress_hooks"] = [hook]  # override hooks for SSE
+        try:
+            with YoutubeDL(job_opts) as ydl:
+                ydl.download([url])
+            job["status"] = "done"
+            job["message"] = f"Done! Files saved to: {os.path.abspath(job['outdir'])}"
+            job["queue"].put({"status": "complete", "message": job["message"]})
+        except Exception as e:
+            job["status"] = "error"
+            job["message"] = f"Error: {e}"
+            job["queue"].put({"status": "error", "message": job["message"]})
+        finally:
+            job["queue"].put(None)
+
+    # If job is pending, start it now (Lazy execution for Serverless)
+    if job.get("status") == "pending":
+        job["status"] = "running"
+        threading.Thread(target=run_job, args=(job_id, job["url"], job["ydl_opts"], job), daemon=True).start()
+
     def gen():
         yield _sse({"status": "start"})
         while True:
@@ -954,6 +973,9 @@ def progress(job_id: str):
 
 @app.route("/open_downloads", methods=["POST"])
 def open_downloads():
+    if os.environ.get("VERCEL") == "1":
+         return jsonify({"status": "error", "message": "Cannot open server folder on Vercel."}), 400
+
     path = os.path.abspath("downloads")
     os.makedirs(path, exist_ok=True)
     try:

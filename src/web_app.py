@@ -274,17 +274,14 @@ INDEX_HTML = """
       </div>
       <div class="card">
         <div class="card-header">
-          <h2 class="h1">Converter vídeo para áudio</h2>
+          <h2 class="h1">Baixar e Converter Áudio</h2>
         </div>
         <div class="card-body">
           <form id="convert-form">
-            <label for="url">URL do Vídeo</label>
-            <input type="text" id="url" name="url" placeholder="Cole a URL do vídeo do YouTube ou Shorts" required />
-            <div class="chips">
-              <span class="chip chip-video" data-url="https://youtu.be/L8OesNa-pkA?si=a-cVuXG6FEu7IfyD">Exemplo vídeo</span>
-              <span class="chip chip-short" data-url="https://youtube.com/shorts/FT_9NOYwWqk?si=eZnIQYx140IKBLlJ">Exemplo short</span>
-            </div>
-            <div class="grid" style="margin-top:16px;">
+            <label for="url">Link do Conteúdo</label>
+            <input type="text" id="url" name="url" placeholder="Cole a URL do vídeo ou áudio (YouTube, TikTok, Instagram, etc)" required />
+
+            <div class="grid" style="margin-top:2rem;">
               <div>
                 <label for="format">Formato</label>
                 <select id="format" name="format" class="hidden-select">
@@ -306,7 +303,7 @@ INDEX_HTML = """
                 <input type="text" id="bitrate" name="bitrate" value="320" />
               </div>
             </div>
-            <label for="ffmpeg" style="margin-top:16px;">Caminho FFmpeg (opcional)</label>
+            <label for="ffmpeg" style="margin-top:2rem;margin-bottom:10px;">Caminho FFmpeg (opcional)</label>
             <input type="text" id="ffmpeg" name="ffmpeg" placeholder="tools/ffmpeg/bin ou C:\\ffmpeg\\bin" />
             <div class="examples">Dica: Rode <code>scripts\\install_ffmpeg.ps1</code>, depois use <code>tools\\ffmpeg\\bin</code>. Deixe vazio para auto-detectar.</div>
             <button class="btn" type="submit" id="submit-btn">Converter</button>
@@ -352,10 +349,10 @@ INDEX_HTML = """
               <div class="dz-text">Arraste e solte um áudio aqui ou clique para escolher</div>
               <input type="file" id="trans-file" accept="audio/*" style="display:none;" />
             </div>
-            <div class="row-actions" style="margin-top:12px;">
-              <button id="use-recording" class="button-secondary" style="display:none;" disabled>Usar última gravação</button>
-              <button id="clear-trans-file" class="button-secondary" type="button" title="Excluir arquivo" style="display:none;">Excluir arquivo</button>
-              <button id="transcribe-btn" class="btn">Transcrever</button>
+            <div class="row-actions" style="margin-top:12px; flex-direction: column; width: 100%;">
+              <button id="use-recording" class="button-secondary" style="display:none; width: 100%;" disabled>Usar última gravação</button>
+              <button id="clear-trans-file" class="button-secondary" type="button" title="Excluir arquivo" style="display:none; width: 100%;">Excluir arquivo</button>
+              <button id="transcribe-btn" class="btn" style="width: 100%; margin-top: 0;">Transcrever</button>
             </div>
             <div class="examples" id="trans-status" style="display:none; margin-top:8px;"></div>
             <div id="trans-output-wrap" class="trans-output-wrap" style="display:none; margin-top:12px;">
@@ -750,11 +747,7 @@ INDEX_HTML = """
         if (!formatWrap.contains(e.target)) { formatWrap.classList.remove('open'); }
       });
 
-      document.querySelectorAll('.chip').forEach(c => c.addEventListener('click', () => {
-        const url = c.getAttribute('data-url');
-        urlInput.value = url;
-        urlInput.focus();
-      }));
+
 
       // Baixar novamente a partir do histórico
       document.addEventListener('click', (e) => {
@@ -782,8 +775,17 @@ INDEX_HTML = """
         msg.style.display = 'block';
       }
 
-      function isValidYouTubeUrl(u) {
-        try { const x = new URL(u); return /(^|\\.)youtube\\.com$/.test(x.hostname) || x.hostname === 'youtu.be'; } catch { return false; }
+      function isValidUrl(u) {
+        try { const x = new URL(u); return x.protocol === 'http:' || x.protocol === 'https:'; } catch { return false; }
+      }
+
+      function formatBytes(bytes, decimals = 1) {
+        if (!bytes) return '';
+        const k = 1024;
+        const dm = decimals < 0 ? 0 : decimals;
+        const sizes = ['B', 'KB', 'MB', 'GB', 'TB'];
+        const i = Math.floor(Math.log(bytes) / Math.log(k));
+        return parseFloat((bytes / Math.pow(k, i)).toFixed(dm)) + ' ' + sizes[i];
       }
 
       function addHistory(entry) {
@@ -793,29 +795,74 @@ INDEX_HTML = """
         renderHistory();
       }
 
+      function getPlatform(url) {
+        try {
+          const u = new URL(url);
+          const h = u.hostname.replace('www.', '');
+          if (h.includes('youtube') || h.includes('youtu.be')) return { name: 'YouTube', cls: 'youtube' };
+          if (h.includes('instagram')) return { name: 'Instagram', cls: 'instagram' };
+          if (h.includes('tiktok')) return { name: 'TikTok', cls: 'tiktok' };
+          if (h.includes('facebook')) return { name: 'Facebook', cls: 'generic' };
+          if (h.includes('twitter') || h.includes('x.com')) return { name: 'X / Twitter', cls: 'generic' };
+          if (h.includes('soundcloud')) return { name: 'SoundCloud', cls: 'soundcloud' };
+          if (h.includes('twitch')) return { name: 'Twitch', cls: 'twitch' };
+          return { name: h.split('.')[0], cls: 'generic' };
+        } catch (e) {
+          return { name: 'Link', cls: 'generic' };
+        }
+      }
+
       function renderHistory() {
         const list = JSON.parse(localStorage.getItem(HISTORY_KEY) || '[]');
         const el = document.getElementById('history-list');
         if (!el) return;
         el.innerHTML = '';
-        (list.slice(0, 5)).forEach(item => {
+        if (list.length === 0) {
+            el.innerHTML = '<div style="text-align:center; color:var(--muted); padding:20px;">Nenhum histórico recente</div>';
+            return;
+        }
+        (list.slice(0, 10)).forEach(item => {
           const div = document.createElement('div');
           const fmt = (item.format || 'mp3').toLowerCase();
-          div.className = 'history-item format-' + fmt;
-          const badge = `<span class="format-badge format-${fmt}">${fmt.toUpperCase()}</span>`;
+          const plat = getPlatform(item.url);
+          
+          div.className = `history-item format-${fmt}`;
+          
           const dlIcon = '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M12 3v10m0 0l4-4m-4 4l-4-4" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/><path d="M20 21H4" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>';
-          const right = (fmt !== 'rec' && isValidYouTubeUrl(item.url))
-            ? `<button class="icon-btn history-download" title="Baixar novamente" data-url="${item.url}" data-format="${fmt}">${dlIcon}</button>`
+          
+          const downloadBtn = (fmt !== 'rec' && isValidUrl(item.url))
+            ? `<button class="btn-download-large history-download" title="Baixar novamente" data-url="${item.url}" data-format="${fmt}">${dlIcon} Baixar</button>`
             : '';
-          const result = (item.status || '').toLowerCase();
-          const statusClass = (result === 'ok')
-            ? 'status-ok'
-            : ((result === 'error' || result === 'erro')
-              ? 'status-error'
-              : (result === 'salvo')
-                ? 'status-saved'
-                : '');
-          div.innerHTML = `<div><div>${badge} • ${item.url}</div><div class="meta">${new Date(item.ts).toLocaleString()}</div></div><div style="display:flex;align-items:center;gap:8px;"><div class="meta ${statusClass}">${item.status}</div>${right}</div>`;
+
+          const statusText = (item.status === 'salvo') ? 'Salvo' : item.status;
+          const statusClass = (item.status === 'salvo' || item.status === 'ok') ? 'saved' : 'error';
+          const statusIcon = (statusClass === 'saved') 
+            ? '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 6L9 17l-5-5"/></svg>'
+            : '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>';
+          
+          const sizeInfo = item.size ? `<span style="margin-left:8px; font-size:0.75rem; color:var(--muted); border-left:1px solid var(--border); padding-left:8px;">${item.size}</span>` : '';
+
+          div.innerHTML = `
+            <div class="history-main">
+                <div class="history-header">
+                   <span class="badge-platform ${plat.cls}">${plat.name}</span>
+                   <span class="badge-format ${fmt}">${fmt.toUpperCase()}</span>
+                   <span class="history-date">${new Date(item.ts).toLocaleString()}</span>
+                </div>
+                <div class="history-url" title="${item.url}">
+                    <a href="${item.url}" target="_blank" rel="noopener noreferrer">${item.url}</a>
+                </div>
+                <div class="history-footer" style="border:none; padding:0; margin-top:8px;">
+                    <div class="history-status ${statusClass}">
+                        ${statusIcon} ${statusText}
+                        ${sizeInfo}
+                    </div>
+                </div>
+            </div>
+            <div class="history-actions">
+                ${downloadBtn}
+            </div>
+          `;
           el.appendChild(div);
         });
       }
@@ -855,12 +902,12 @@ INDEX_HTML = """
         overlay.style.display = 'flex';
 
         const url = urlInput.value.trim();
-        if (!isValidYouTubeUrl(url)) {
+        if (!isValidUrl(url)) {
           overlay.style.display = 'none';
           btn.disabled = false;
           urlInput.focus();
           urlInput.style.borderColor = '#ef4444';
-          setMessage('URL inválida. Informe um link do YouTube ou Shorts.', 'error');
+          setMessage('URL inválida. Informe um link válido.', 'error');
           if (currentHistoryBtn) { currentHistoryBtn.classList.remove('loading'); currentHistoryBtn.removeAttribute('disabled'); currentHistoryBtn = null; }
           return;
         }
@@ -876,10 +923,12 @@ INDEX_HTML = """
             statusEl.classList.remove('status-ok', 'status-error');
             statusEl.classList.add('status-progress');
             const es = new EventSource(`/progress/${data.job_id}`);
+            let lastTotalSize = 0;
             es.onmessage = (ev) => {
               let payload = {}; try { payload = JSON.parse(ev.data); } catch {}
               if (payload.status === 'downloading') {
                 const pct = Math.max(0, Math.min(100, payload.pct || 0));
+                if (payload.total) lastTotalSize = payload.total;
                 progressBar.style.width = pct + '%';
                 const eta = payload.eta ? `${Math.floor(payload.eta/60)}m ${Math.floor(payload.eta%60)}s` : '--';
                 const speed = payload.speed ? (payload.speed/1024/1024).toFixed(2) + ' MB/s' : '--';
@@ -898,7 +947,7 @@ INDEX_HTML = """
                 setMessage(payload.message || 'Concluído!', 'success');
                 if (openDownloadsBtn) { openDownloadsBtn.style.display = 'inline-block'; }
                 es.close();
-                addHistory({ url, format: formatSel.value, ts: Date.now(), status: 'ok' });
+                addHistory({ url, format: formatSel.value, ts: Date.now(), status: 'ok', size: formatBytes(lastTotalSize) });
                 overlay.style.display = 'none';
                 btn.disabled = false;
                 if (currentHistoryBtn) { currentHistoryBtn.classList.remove('loading'); currentHistoryBtn.removeAttribute('disabled'); currentHistoryBtn = null; }
@@ -1140,6 +1189,10 @@ INDEX_HTML = """
           const el = document.getElementById('history-list');
           if (!el) return;
           el.innerHTML = '';
+          if (data.length === 0) {
+             el.innerHTML = '<div style="text-align:center; color:var(--muted); padding:20px;">Nenhum histórico no Supabase</div>';
+             return;
+          }
           data.forEach(item => {
              const entry = {
                url: item.url,
@@ -1150,14 +1203,40 @@ INDEX_HTML = """
              
              const div = document.createElement('div');
              const fmt = (entry.format || 'mp3').toLowerCase();
-             div.className = 'history-item format-' + fmt;
-             const badge = `<span class="format-badge format-${fmt}">${fmt.toUpperCase()}</span>`;
-             const dlIcon = '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M12 3v10m0 0l4-4m-4 4l-4-4" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/><path d="M20 21H4" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>';
-             const right = (isValidYouTubeUrl(entry.url))
-                ? `<button class="icon-btn history-download" title="Baixar novamente" data-url="${entry.url}" data-format="${fmt}">${dlIcon}</button>`
+             const plat = getPlatform(entry.url);
+             const isTrans = fmt === 'txt' || fmt === 'json' || fmt === 'srt';
+             const action = isTrans ? 'Transcrição' : 'Conversão';
+             
+             div.className = 'history-item';
+             
+             const dlIcon = '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M12 3v10m0 0l4-4m-4 4l-4-4" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/><path d="M20 21H4" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>';
+             
+             const downloadBtn = (isValidUrl(entry.url))
+                ? `<button class="history-btn history-download" title="Baixar novamente" data-url="${entry.url}" data-format="${fmt}">${dlIcon} Download</button>`
                 : '';
-             const statusClass = 'status-saved';
-             div.innerHTML = `<div><div>${badge} • ${entry.url}</div><div class="meta">${new Date(entry.ts).toLocaleString()}</div></div><div style="display:flex;align-items:center;gap:8px;"><div class="meta ${statusClass}">Supabase</div>${right}</div>`;
+             
+             const statusText = 'Salvo (Cloud)';
+             const statusClass = 'saved';
+             const statusIcon = '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 6L9 17l-5-5"/></svg>';
+             
+             div.innerHTML = `
+                <div class="history-header">
+                   <span class="platform-tag ${plat.cls}">${plat.name}</span>
+                   <span class="action-tag">${action}</span>
+                   <span class="date-tag">${new Date(entry.ts).toLocaleString()}</span>
+                </div>
+                <div class="history-url" title="${entry.url}">
+                    <a href="${entry.url}" target="_blank" rel="noopener noreferrer">${entry.url}</a>
+                </div>
+                <div class="history-footer">
+                    <div class="history-status ${statusClass}">
+                        ${statusIcon} ${statusText} • <span style="text-transform:uppercase; font-size:0.75rem; background:rgba(255,255,255,0.1); padding:1px 4px; border-radius:4px;">${fmt}</span>
+                    </div>
+                    <div class="history-actions">
+                        ${downloadBtn}
+                    </div>
+                </div>
+             `;
              el.appendChild(div);
           });
         }
@@ -1397,7 +1476,7 @@ def open_downloads():
     if os.environ.get("VERCEL") == "1":
          return jsonify({"status": "error", "message": "Cannot open server folder on Vercel."}), 400
 
-    path = os.path.abspath("downloads")
+    path = os.path.join(os.path.expanduser("~"), "Downloads")
     os.makedirs(path, exist_ok=True)
     try:
         if os.name == "nt":
@@ -1497,7 +1576,6 @@ HISTORY_HTML = """
         background: rgba(255,255,255,0.1);
         color: var(--text);
       }
-      .format-mp3 { background: rgba(29, 185, 84, 0.15); color: #1db954; }
       .format-m4a { background: rgba(255, 107, 0, 0.15); color: #ff6b00; }
       .format-rec { background: rgba(225, 48, 108, 0.15); color: #e1306c; }
       .format-txt { background: rgba(66, 133, 244, 0.15); color: #4285f4; }
@@ -1593,31 +1671,52 @@ HISTORY_HTML = """
         renderList(data);
       }
       
+      function getPlatform(url) {
+        try {
+          const u = new URL(url);
+          const h = u.hostname.replace('www.', '');
+          if (h.includes('youtube') || h.includes('youtu.be')) return { name: 'YouTube', cls: 'youtube' };
+          if (h.includes('instagram')) return { name: 'Instagram', cls: 'instagram' };
+          if (h.includes('tiktok')) return { name: 'TikTok', cls: 'tiktok' };
+          if (h.includes('facebook')) return { name: 'Facebook', cls: 'generic' };
+          if (h.includes('twitter') || h.includes('x.com')) return { name: 'X / Twitter', cls: 'generic' };
+          if (h.includes('twitch')) return { name: 'Twitch', cls: 'twitch' };
+          if (h.includes('soundcloud')) return { name: 'SoundCloud', cls: 'soundcloud' };
+          return { name: h.split('.')[0], cls: 'generic' };
+        } catch (e) {
+          return { name: 'Link', cls: 'generic' };
+        }
+      }
+
       function renderList(data) {
         listEl.innerHTML = '';
         data.forEach(item => {
              const div = document.createElement('div');
              const fmt = (item.format || 'mp3').toLowerCase();
-             div.className = 'history-item';
+             const plat = getPlatform(item.url);
              
-             const badge = `<span class="format-badge format-${fmt}">${fmt.toUpperCase()}</span>`;
+             div.className = `history-item format-${fmt}`;
+             
              const ts = new Date(item.created_at).toLocaleString();
              
              const dlIcon = '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M12 3v10m0 0l4-4m-4 4l-4-4" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/><path d="M20 21H4" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>';
              
-             let isYt = false;
-             try { const x = new URL(item.url); isYt = /(^|\\.)youtube\\.com$/.test(x.hostname) || x.hostname === 'youtu.be'; } catch {}
-
-             const action = isYt 
-                ? `<a href="/?url=${encodeURIComponent(item.url)}&format=${fmt}" class="icon-btn" title="Baixar novamente">${dlIcon}</a>` 
-                : '';
+             const action = `<a href="/?url=${encodeURIComponent(item.url)}&format=${fmt}" class="btn-download-large" title="Baixar novamente" style="text-decoration:none;">${dlIcon} Baixar</a>`;
 
              div.innerHTML = `
-                <div>
-                  <div style="font-weight:500; margin-bottom:4px; word-break: break-all;">${badge} ${item.url}</div>
-                  <div class="meta">${ts}</div>
+                <div class="history-main">
+                    <div class="history-header">
+                       <span class="badge-platform ${plat.cls}">${plat.name}</span>
+                       <span class="badge-format ${fmt}">${fmt.toUpperCase()}</span>
+                       <span class="history-date">${ts}</span>
+                    </div>
+                    <div class="history-url" title="${item.url}">
+                        <a href="${item.url}" target="_blank" rel="noopener noreferrer">${item.url}</a>
+                    </div>
                 </div>
-                <div>${action}</div>
+                <div class="history-actions">
+                    ${action}
+                </div>
              `;
              listEl.appendChild(div);
         });

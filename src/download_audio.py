@@ -75,22 +75,28 @@ def build_opts(outdir: str, audio_format: str, bitrate: int, no_playlist: bool, 
     if audio_format == "mp4":
         audio_format = "m4a"
 
-    if audio_format == "mp3":
-        postprocessors.append({
-            "key": "FFmpegExtractAudio",
-            "preferredcodec": "mp3",
-            "preferredquality": str(bitrate),
-        })
-    elif audio_format == "m4a":
-        postprocessors.append({
-            "key": "FFmpegExtractAudio",
-            "preferredcodec": "m4a",
-        })
-    else:
-        raise ValueError("Invalid format. Use 'mp3' or 'm4a'.")
+    has_ff = ffmpeg_location is not None or has_ffmpeg()
 
+    if has_ff:
+        if audio_format == "mp3":
+            postprocessors.append({
+                "key": "FFmpegExtractAudio",
+                "preferredcodec": "mp3",
+                "preferredquality": str(bitrate),
+            })
+        elif audio_format == "m4a":
+            postprocessors.append({
+                "key": "FFmpegExtractAudio",
+                "preferredcodec": "m4a",
+            })
+        else:
+            raise ValueError("Invalid format. Use 'mp3' or 'm4a'.")
+    
+    # If no FFmpeg, we try to download the format directly if possible, or just bestaudio.
+    # We can't convert, so we skip postprocessors.
+    
     opts = {
-        "format": "bestaudio/best",
+        "format": f"bestaudio[ext={audio_format}]/bestaudio/best" if (not has_ff and audio_format == 'm4a') else "bestaudio/best",
         "outtmpl": os.path.join(outdir, "%(title)s.%(ext)s") if not outtmpl else outtmpl,
         "postprocessors": postprocessors,
         "noplaylist": no_playlist,

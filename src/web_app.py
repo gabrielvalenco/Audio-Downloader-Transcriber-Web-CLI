@@ -1,5 +1,7 @@
 from flask import Flask, request, render_template_string, jsonify, Response, redirect, send_from_directory
 import os
+from dotenv import load_dotenv
+load_dotenv()
 import uuid
 import json
 import queue
@@ -26,22 +28,239 @@ INDEX_HTML = """
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <title>Audio Downloader</title>
+    <title>VoxHub</title>
     <link rel="icon" href="/favicon.svg" type="image/svg+xml" />
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;600;700&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <script>
+      window.SUPABASE_URL = "{{ supabase_url }}";
+      window.SUPABASE_KEY = "{{ supabase_key }}";
+    </script>
+    <style>
+      /* Auth Styles */
+      .auth-modal {
+        display: none;
+        position: fixed;
+        top: 0; left: 0; width: 100%; height: 100%;
+        background: rgba(0, 0, 0, 0.6);
+        backdrop-filter: blur(5px);
+        z-index: 1000;
+        justify-content: center;
+        align-items: center;
+        opacity: 0;
+        transition: opacity 0.3s ease;
+      }
+      .auth-modal.open { 
+        display: flex; 
+        opacity: 1;
+      }
+      
+      .auth-card {
+        background: var(--card);
+        padding: 32px;
+        border-radius: 16px;
+        border: 1px solid var(--border);
+        width: 100%;
+        max-width: 380px;
+        box-shadow: 0 10px 40px rgba(0,0,0,0.5);
+        transform: translateY(20px) scale(0.95);
+        transition: transform 0.4s cubic-bezier(0.16, 1, 0.3, 1);
+        font-family: 'JetBrains Mono', monospace;
+      }
+
+      .auth-modal.open .auth-card {
+        transform: translateY(0) scale(1);
+      }
+
+      .auth-header { 
+        font-size: 24px; 
+        font-weight: 700; 
+        margin-bottom: 24px; 
+        text-align: center;
+        color: var(--text);
+        letter-spacing: -0.5px;
+      }
+      
+      .auth-form input { 
+        width: 100%; 
+        margin-bottom: 16px; 
+        padding: 12px 16px;
+        background: rgba(255, 255, 255, 0.05);
+        border: 1px solid var(--border);
+        border-radius: 8px;
+        color: var(--text);
+        font-family: inherit;
+        font-size: 14px;
+        transition: all 0.2s ease;
+      }
+      
+      .auth-form input:focus {
+        outline: none;
+        border-color: var(--accent);
+        background: rgba(255, 255, 255, 0.08);
+        box-shadow: 0 0 0 4px rgba(225, 48, 108, 0.15);
+      }
+      
+      .auth-actions { 
+        display: flex; 
+        flex-direction: column; 
+        gap: 12px; 
+        margin-top: 8px;
+      }
+      
+      .auth-actions button {
+        width: 100%;
+        padding: 12px;
+        border-radius: 8px;
+        font-weight: 600;
+        font-size: 14px;
+        cursor: pointer;
+        transition: all 0.2s;
+        text-transform: uppercase;
+        letter-spacing: 0.5px;
+      }
+
+      #auth-submit {
+        background: var(--accent, #e1306c);
+        color: white;
+        border: none;
+        box-shadow: 0 4px 12px rgba(225, 48, 108, 0.3);
+      }
+      
+      #auth-submit:hover {
+        background: var(--accent-hover, #c12055);
+        transform: translateY(-1px);
+        box-shadow: 0 6px 16px rgba(225, 48, 108, 0.4);
+      }
+      
+      #auth-submit:active {
+        transform: translateY(0);
+      }
+      
+      #auth-cancel {
+        background: transparent;
+        border: 1px solid var(--border);
+        color: var(--muted);
+      }
+      
+      #auth-cancel:hover {
+        background: rgba(255, 255, 255, 0.05);
+        color: var(--text);
+        border-color: var(--muted);
+      }
+
+      .auth-link {
+        font-size: 13px; 
+        color: var(--muted); 
+        text-align: center; 
+        margin-top: 20px; 
+        cursor: pointer; 
+        text-decoration: none;
+        transition: color 0.2s;
+      }
+      
+      .auth-link:hover {
+        color: var(--accent);
+        text-decoration: underline;
+      }
+      
+      .user-menu { display: flex; align-items: center; gap: 12px; margin-left: auto; position: relative; }
+      .user-avatar { 
+        width: 40px; height: 40px; border-radius: 50%; background: var(--accent); 
+        color: #fff; display: flex; align-items: center; justify-content: center; font-weight: bold;
+        cursor: pointer;
+        box-shadow: 0 2px 8px rgba(0,0,0,0.2);
+        user-select: none;
+        font-size: 16px;
+      }
+      
+      .header-actions .button-secondary {
+        height: 40px;
+        padding: 0 20px;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+      }
+      .user-dropdown {
+        position: absolute;
+        top: 100%;
+        right: 0;
+        margin-top: 10px;
+        background: var(--card);
+        border: 1px solid var(--border);
+        border-radius: 12px;
+        box-shadow: 0 10px 30px rgba(0,0,0,0.5);
+        min-width: 200px;
+        display: none;
+        flex-direction: column;
+        z-index: 1000;
+        overflow: hidden;
+        animation: fadeIn 0.2s ease;
+      }
+      .user-dropdown.show { display: flex; }
+      .user-dropdown-item {
+        padding: 12px 16px;
+        cursor: pointer;
+        font-size: 14px;
+        color: var(--text);
+        transition: all 0.2s;
+        text-align: left;
+        background: none;
+        border: none;
+        width: 100%;
+        display: flex;
+        align-items: center;
+        gap: 8px;
+      }
+      .user-dropdown-item:hover {
+        background: var(--bg);
+        color: var(--accent);
+      }
+      .user-dropdown-divider {
+        height: 1px;
+        background: var(--border);
+        margin: 4px 0;
+      }
+      .user-email-display {
+        font-size: 12px;
+        color: var(--muted);
+        cursor: default !important;
+        font-weight: 500;
+        padding-bottom: 8px;
+      }
+      .user-email-display:hover {
+        background: none !important;
+        color: var(--muted) !important;
+      }
+      .hidden { display: none !important; }
+    </style>
   </head>
   <body>
     <div class="container">
       <div class="header">
         <div class="header-left">
-          <div class="brand">Audio Downloader</div>
-          <div class="badge">YouTube → MP3/M4A</div>
+          <div class="brand">VoxHub</div>
         </div>
         <div class="header-actions">
-          <button id="toggle-history" class="toggle" title="Mostrar histórico">Histórico</button>
+          <div id="auth-section" class="user-menu hidden">
+             <div id="user-avatar" class="user-avatar" title="Perfil">U</div>
+             <div id="user-dropdown" class="user-dropdown">
+                <div id="user-email-display" class="user-dropdown-item user-email-display"></div>
+                <div class="user-dropdown-divider"></div>
+                <a href="/history" class="user-dropdown-item" style="text-decoration:none;">
+                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+                  Histórico
+                </a>
+                <button id="logout-btn" class="user-dropdown-item">
+                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M9 21H5a2 2 0 01-2-2V5a2 2 0 012-2h4M16 17l5-5-5-5M21 12H9" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+                  Sair
+                </button>
+             </div>
+          </div>
+          <button id="login-btn" class="button-secondary">Entrar</button>
           <button id="theme-toggle" class="toggle theme-toggle" title="Alternar tema" aria-label="Alternar tema">
             <svg class="moon" viewBox="0 0 24 24" width="20" height="20" aria-hidden="true" focusable="false">
               <path d="M21 12.79A9 9 0 0111.21 3c-.2 0-.39 0-.58.02a8 8 0 1010.35 10.35c.02-.19.02-.38.02-.58z" fill="currentColor"></path>
@@ -55,30 +274,30 @@ INDEX_HTML = """
       </div>
       <div class="card">
         <div class="card-header">
-          <h2 class="h1">Convert a video to audio</h2>
+          <h2 class="h1">Converter vídeo para áudio</h2>
         </div>
         <div class="card-body">
           <form id="convert-form">
-            <label for="url">Video URL</label>
-            <input type="text" id="url" name="url" placeholder="Paste the YouTube video or Shorts URL" required />
+            <label for="url">URL do Vídeo</label>
+            <input type="text" id="url" name="url" placeholder="Cole a URL do vídeo do YouTube ou Shorts" required />
             <div class="chips">
-              <span class="chip chip-video" data-url="https://youtu.be/L8OesNa-pkA?si=a-cVuXG6FEu7IfyD">Sample video</span>
-              <span class="chip chip-short" data-url="https://youtube.com/shorts/FT_9NOYwWqk?si=eZnIQYx140IKBLlJ">Sample short</span>
+              <span class="chip chip-video" data-url="https://youtu.be/L8OesNa-pkA?si=a-cVuXG6FEu7IfyD">Exemplo vídeo</span>
+              <span class="chip chip-short" data-url="https://youtube.com/shorts/FT_9NOYwWqk?si=eZnIQYx140IKBLlJ">Exemplo short</span>
             </div>
             <div class="grid" style="margin-top:16px;">
               <div>
-                <label for="format">Audio Format</label>
+                <label for="format">Formato</label>
                 <select id="format" name="format" class="hidden-select">
                   <option value="mp3" selected>MP3</option>
                   <option value="m4a">M4A</option>
-                  <option value="mp4">MP4 (alias for M4A)</option>
+                  <option value="mp4">MP4 (alias para M4A)</option>
                 </select>
                 <div class="select-wrap" id="format-custom">
                   <button type="button" id="format-display" class="select-display">MP3</button>
                   <div id="format-menu" class="select-menu" role="listbox" aria-labelledby="format-display">
                     <div class="select-item" role="option" data-val="mp3">MP3</div>
                     <div class="select-item" role="option" data-val="m4a">M4A</div>
-                    <div class="select-item" role="option" data-val="mp4">MP4 (alias for M4A)</div>
+                    <div class="select-item" role="option" data-val="mp4">MP4 (alias para M4A)</div>
                   </div>
                 </div>
               </div>
@@ -87,10 +306,10 @@ INDEX_HTML = """
                 <input type="text" id="bitrate" name="bitrate" value="320" />
               </div>
             </div>
-            <label for="ffmpeg" style="margin-top:16px;">FFmpeg path (optional)</label>
-            <input type="text" id="ffmpeg" name="ffmpeg" placeholder="tools/ffmpeg/bin or C:\\ffmpeg\\bin" />
-            <div class="examples">Tip: Run <code>scripts\\install_ffmpeg.ps1</code>, then use <code>tools\\ffmpeg\\bin</code>. Leave empty to auto-detect.</div>
-            <button class="btn" type="submit" id="submit-btn">Convert</button>
+            <label for="ffmpeg" style="margin-top:16px;">Caminho FFmpeg (opcional)</label>
+            <input type="text" id="ffmpeg" name="ffmpeg" placeholder="tools/ffmpeg/bin ou C:\\ffmpeg\\bin" />
+            <div class="examples">Dica: Rode <code>scripts\\install_ffmpeg.ps1</code>, depois use <code>tools\\ffmpeg\\bin</code>. Deixe vazio para auto-detectar.</div>
+            <button class="btn" type="submit" id="submit-btn">Converter</button>
           </form>
           <div id="message" class="msg" style="display:none;"></div>
           <div class="progress" id="progress" style="display:none;"><div class="bar" id="progress-bar"></div></div>
@@ -102,21 +321,21 @@ INDEX_HTML = """
       </div>
       <div class="card">
         <div class="card-header">
-          <h2 class="h1">Record audio</h2>
+          <h2 class="h1">Gravar áudio</h2>
         </div>
         <div class="card-body">
           <div id="recorder">
             <div class="rec-controls">
-              <button id="rec-start" class="btn">Start recording</button>
+              <button id="rec-start" class="btn">Iniciar gravação</button>
               <div class="rec-right">
                 <div id="rec-timer" class="rec-timer" style="display:none;">00:00</div>
-                <button id="rec-stop" class="button-secondary" style="display:none;">Stop</button>
+                <button id="rec-stop" class="button-secondary" style="display:none;">Parar</button>
               </div>
             </div>
             <audio id="rec-audio" controls style="display:none;margin-top:12px;"></audio>
             <div class="row-actions">
-              <button id="rec-download" class="button-secondary" style="display:none;" disabled>Download recording</button>
-              <button id="rec-delete" class="button-secondary" style="display:none;" disabled>Delete recording</button>
+              <button id="rec-download" class="button-secondary" style="display:none;" disabled>Baixar gravação</button>
+              <button id="rec-delete" class="button-secondary" style="display:none;" disabled>Excluir gravação</button>
             </div>
             <div class="examples" id="rec-status" style="display:none; margin-top:8px;"></div>
           </div>
@@ -124,11 +343,11 @@ INDEX_HTML = """
       </div>
       <div class="card">
         <div class="card-header">
-          <h2 class="h1">Transcribe audio</h2>
+          <h2 class="h1">Transcrever áudio</h2>
         </div>
         <div class="card-body">
             <div id="transcribe">
-            <label for="trans-file" style="margin-top:12px;">Audio file</label>
+            <label for="trans-file" style="margin-top:12px;">Arquivo de áudio</label>
             <div id="trans-dropzone" class="dropzone" tabindex="0" role="button" aria-label="Select or drop audio file">
               <div class="dz-text">Arraste e solte um áudio aqui ou clique para escolher</div>
               <input type="file" id="trans-file" accept="audio/*" style="display:none;" />
@@ -155,12 +374,25 @@ INDEX_HTML = """
     <path d="M12 4l-6 6h4v8h4v-8h4l-6-6z"></path>
   </svg>
 </button>
-      <div class="history" style="display:none;">
-        <h3>Histórico</h3>
-        <div id="history-list" class="history-list"></div>
-      </div>
     </div>
     <div class="overlay" id="overlay"><div class="spinner"></div></div>
+
+    <!-- Auth Modal -->
+    <div id="auth-modal" class="auth-modal">
+      <div class="auth-card">
+        <div class="auth-header" id="auth-title">Entrar</div>
+        <div class="auth-form">
+          <input type="email" id="auth-email" placeholder="Email" />
+          <input type="password" id="auth-password" placeholder="Senha" />
+          <div class="auth-actions">
+            <button id="auth-submit" class="btn">Entrar</button>
+            <button id="auth-cancel" class="button-secondary">Cancelar</button>
+          </div>
+          <div id="auth-msg" class="examples" style="text-align:center;margin-top:8px;display:none;"></div>
+          <div id="auth-switch" class="auth-link">Não tem conta? Cadastre-se</div>
+        </div>
+      </div>
+    </div>
     <script>
       const form = document.getElementById('convert-form');
       const msg = document.getElementById('message');
@@ -178,8 +410,6 @@ INDEX_HTML = """
       const themeToggle = document.getElementById('theme-toggle');
       const openDownloadsBtn = document.getElementById('open-downloads');
       const scrollTopBtn = document.getElementById('scroll-top');
-      const historyToggle = document.getElementById('toggle-history');
-       const historySection = document.querySelector('.history');
        // Recorder elements
        const recStartBtn = document.getElementById('rec-start');
        const recStopBtn = document.getElementById('rec-stop');
@@ -350,6 +580,13 @@ INDEX_HTML = """
              transStatusEl.classList.remove('status-progress');
              transStatusEl.classList.add('status-ok');
              renderTransStepsAllDone('Transcrição concluída');
+             
+             addHistory({ 
+               url: 'Transcrição: ' + (file.name || 'Áudio gravado'), 
+               format: 'txt', 
+               ts: Date.now(), 
+               status: 'ok' 
+             });
            } else {
              stopTransLoading();
              transStatusEl.classList.remove('status-progress');
@@ -381,22 +618,6 @@ INDEX_HTML = """
        });
 
        // Chave da API agora é lida do ambiente no backend
-
-      // Toggle de histórico (padrão oculto)
-      function setHistoryVisible(v) {
-        historySection.style.display = v ? 'block' : 'none';
-        historyToggle.textContent = v ? 'Ocultar histórico' : 'Mostrar histórico';
-      }
-      const storedHistoryVisible = localStorage.getItem(HISTORY_VISIBLE_KEY);
-      setHistoryVisible(storedHistoryVisible === 'true');
-      historyToggle.addEventListener('click', () => {
-        const next = historySection.style.display === 'none';
-        setHistoryVisible(next);
-        localStorage.setItem(HISTORY_VISIBLE_KEY, next ? 'true' : 'false');
-        if (next) {
-          historySection.scrollIntoView({ behavior: 'smooth', block: 'start' });
-        }
-      });
 
       // Gravação de áudio via MediaRecorder
       function formatTime(ms) {
@@ -575,6 +796,7 @@ INDEX_HTML = """
       function renderHistory() {
         const list = JSON.parse(localStorage.getItem(HISTORY_KEY) || '[]');
         const el = document.getElementById('history-list');
+        if (!el) return;
         el.innerHTML = '';
         (list.slice(0, 5)).forEach(item => {
           const div = document.createElement('div');
@@ -748,6 +970,198 @@ INDEX_HTML = """
       scrollTopBtn?.addEventListener('click', () => {
         window.scrollTo({ top: 0, behavior: 'smooth' });
       });
+
+      // --- SUPABASE INTEGRATION ---
+      const supabaseClient = window.SUPABASE_URL ? supabase.createClient(window.SUPABASE_URL, window.SUPABASE_KEY) : null;
+      let currentUser = null;
+
+      const loginBtn = document.getElementById('login-btn');
+      const logoutBtn = document.getElementById('logout-btn');
+      const authSection = document.getElementById('auth-section');
+      const userAvatar = document.getElementById('user-avatar');
+      const authModal = document.getElementById('auth-modal');
+      const authEmail = document.getElementById('auth-email');
+      const authPass = document.getElementById('auth-password');
+      const authSubmit = document.getElementById('auth-submit');
+      const authCancel = document.getElementById('auth-cancel');
+      const authSwitch = document.getElementById('auth-switch');
+      const authMsg = document.getElementById('auth-msg');
+      const authTitle = document.getElementById('auth-title');
+      const userDropdown = document.getElementById('user-dropdown');
+      const userEmailDisplay = document.getElementById('user-email-display');
+
+      // Dropdown toggle logic
+      userAvatar?.addEventListener('click', (e) => {
+        e.stopPropagation();
+        userDropdown.classList.toggle('show');
+      });
+
+      document.addEventListener('click', (e) => {
+        if (userDropdown && !userDropdown.contains(e.target) && e.target !== userAvatar) {
+          userDropdown.classList.remove('show');
+        }
+      });
+
+      let isLoginMode = true;
+
+      function toggleAuthModal(show) {
+        authModal.classList.toggle('open', show);
+        if (show) {
+          authEmail.value = ''; authPass.value = ''; authMsg.style.display = 'none';
+          isLoginMode = true; updateAuthMode();
+        }
+      }
+
+      function updateAuthMode() {
+        authTitle.textContent = isLoginMode ? 'Entrar' : 'Criar conta';
+        authSubmit.textContent = isLoginMode ? 'Entrar' : 'Cadastrar';
+        authSwitch.textContent = isLoginMode ? 'Não tem conta? Cadastre-se' : 'Já tem conta? Entre';
+      }
+
+      authSwitch?.addEventListener('click', () => {
+        isLoginMode = !isLoginMode;
+        updateAuthMode();
+      });
+
+      loginBtn?.addEventListener('click', () => toggleAuthModal(true));
+      authCancel?.addEventListener('click', () => toggleAuthModal(false));
+      authModal?.addEventListener('click', (e) => { if (e.target === authModal) toggleAuthModal(false); });
+
+      authSubmit?.addEventListener('click', async () => {
+        const email = authEmail.value.trim();
+        const password = authPass.value.trim();
+        if (!email || !password) {
+          authMsg.textContent = 'Preencha todos os campos.';
+          authMsg.style.display = 'block';
+          authMsg.className = 'examples status-error';
+          return;
+        }
+        authSubmit.disabled = true;
+        authSubmit.textContent = 'Processando...';
+        
+        try {
+          let error = null;
+          if (isLoginMode) {
+            const res = await supabaseClient.auth.signInWithPassword({ email, password });
+            error = res.error;
+          } else {
+            const res = await supabaseClient.auth.signUp({ email, password });
+            error = res.error;
+            if (!error && res.data.user && !res.data.session) {
+              authMsg.textContent = 'Verifique seu email para confirmar o cadastro.';
+              authMsg.className = 'examples status-ok';
+              authMsg.style.display = 'block';
+              authSubmit.disabled = false;
+              authSubmit.textContent = 'Cadastrar';
+              return;
+            }
+          }
+
+          if (error) {
+            authMsg.textContent = error.message;
+            authMsg.className = 'examples status-error';
+            authMsg.style.display = 'block';
+          } else {
+            toggleAuthModal(false);
+          }
+        } catch (err) {
+          console.error(err);
+          authMsg.textContent = 'Erro inesperado.';
+          authMsg.className = 'examples status-error';
+          authMsg.style.display = 'block';
+        }
+        authSubmit.disabled = false;
+        updateAuthMode();
+      });
+
+      logoutBtn?.addEventListener('click', async () => {
+        await supabaseClient.auth.signOut();
+      });
+
+      if (supabaseClient) {
+        supabaseClient.auth.onAuthStateChange((event, session) => {
+          currentUser = session?.user || null;
+          if (currentUser) {
+            loginBtn.classList.add('hidden');
+            authSection.classList.remove('hidden');
+            userAvatar.textContent = (currentUser.email || 'U').charAt(0).toUpperCase();
+            if (userEmailDisplay) userEmailDisplay.textContent = currentUser.email;
+            loadSupabaseHistory();
+          } else {
+            loginBtn.classList.remove('hidden');
+            authSection.classList.add('hidden');
+            // Reverter para LocalStorage se deslogar
+            originalRenderHistory();
+          }
+        });
+      }
+
+      // Sobrescrever funções de histórico para usar Supabase
+      const originalAddHistory = addHistory;
+      const originalRenderHistory = renderHistory;
+
+      addHistory = function(entry) {
+        // Sempre salva localmente
+        originalAddHistory(entry);
+        
+        // Se logado, salva no Supabase
+        if (currentUser && supabaseClient) {
+          // Remover filtro de gravação para salvar tudo
+          // if (entry.format === 'rec') return;
+
+          supabaseClient.from('history').insert({
+            user_id: currentUser.id,
+            url: entry.url,
+            format: entry.format,
+            created_at: new Date().toISOString()
+          }).then(({ error }) => {
+            if (!error) loadSupabaseHistory();
+          });
+        }
+      };
+
+      renderHistory = function() {
+        if (currentUser) {
+           loadSupabaseHistory();
+        } else {
+           originalRenderHistory();
+        }
+      };
+
+      async function loadSupabaseHistory() {
+        if (!currentUser || !supabaseClient) return;
+        const { data, error } = await supabaseClient
+          .from('history')
+          .select('*')
+          .order('created_at', { ascending: false })
+          .limit(10);
+        
+        if (data && !error) {
+          const el = document.getElementById('history-list');
+          if (!el) return;
+          el.innerHTML = '';
+          data.forEach(item => {
+             const entry = {
+               url: item.url,
+               format: item.format,
+               ts: new Date(item.created_at).getTime(),
+               status: 'salvo'
+             };
+             
+             const div = document.createElement('div');
+             const fmt = (entry.format || 'mp3').toLowerCase();
+             div.className = 'history-item format-' + fmt;
+             const badge = `<span class="format-badge format-${fmt}">${fmt.toUpperCase()}</span>`;
+             const dlIcon = '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M12 3v10m0 0l4-4m-4 4l-4-4" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/><path d="M20 21H4" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>';
+             const right = (isValidYouTubeUrl(entry.url))
+                ? `<button class="icon-btn history-download" title="Baixar novamente" data-url="${entry.url}" data-format="${fmt}">${dlIcon}</button>`
+                : '';
+             const statusClass = 'status-saved';
+             div.innerHTML = `<div><div>${badge} • ${entry.url}</div><div class="meta">${new Date(entry.ts).toLocaleString()}</div></div><div style="display:flex;align-items:center;gap:8px;"><div class="meta ${statusClass}">Supabase</div>${right}</div>`;
+             el.appendChild(div);
+          });
+        }
+      }
     </script>
   </body>
 </html>
@@ -756,7 +1170,12 @@ INDEX_HTML = """
 
 @app.route("/", methods=["GET"])
 def index():
-    return render_template_string(INDEX_HTML, message=None)
+    return render_template_string(
+        INDEX_HTML, 
+        message=None,
+        supabase_url=os.environ.get("SUPABASE_URL", ""),
+        supabase_key=os.environ.get("SUPABASE_KEY", "")
+    )
 
 
 @app.route("/download", methods=["POST"])
@@ -897,7 +1316,9 @@ def transcribe():
                 text = resp.candidates[0].content.parts[0].text  # type: ignore
             except Exception:
                 text = ""
-        return jsonify({"status": "ok", "text": text or ""})
+            return jsonify({"status": "ok", "text": text or ""})
+        else:
+            return jsonify({"status": "ok", "text": "Transcrição concluída (mock)."})
     except Exception as e:
         return jsonify({"status": "error", "message": str(e)}), 500
 
@@ -998,6 +1419,228 @@ def favicon_svg():
 @app.route("/favicon.ico")
 def favicon_ico():
     return redirect("/favicon.svg", code=302)
+
+
+HISTORY_HTML = """
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>VoxHub - Histórico</title>
+    <link rel="icon" href="/favicon.svg" type="image/svg+xml" />
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <script>
+      window.SUPABASE_URL = "{{ supabase_url }}";
+      window.SUPABASE_KEY = "{{ supabase_key }}";
+    </script>
+    <style>
+      .history-container { 
+        max-width: 900px; 
+        margin: 0 auto; 
+        padding: 32px;
+        min-height: 100vh;
+      }
+      .history-header {
+        display: flex;
+        align-items: center;
+        margin-bottom: 24px;
+        gap: 16px;
+      }
+      .empty-history {
+        color: var(--muted);
+        text-align: center;
+        margin: 36px;
+        font-size: 16px;
+        display: none;
+      }
+      .history-list {
+        background: var(--card);
+        border: 1px solid var(--border);
+        border-radius: 12px;
+        overflow: hidden;
+      }
+      .history-item {
+        padding: 16px 20px;
+        border-bottom: 1px solid var(--border);
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        transition: background 0.2s;
+      }
+      .history-item:last-child { border-bottom: none; }
+      .history-item:hover { background: rgba(255,255,255,0.02); }
+      
+      .back-btn {
+        display: inline-flex;
+        align-items: center;
+        gap: 8px;
+        color: var(--muted);
+        text-decoration: none;
+        font-weight: 500;
+        transition: color 0.2s;
+        cursor: pointer;
+      }
+      .back-btn:hover { color: var(--text); }
+      
+      .format-badge {
+        display: inline-block;
+        padding: 2px 8px;
+        border-radius: 4px;
+        font-size: 11px;
+        font-weight: 700;
+        margin-right: 8px;
+        background: rgba(255,255,255,0.1);
+        color: var(--text);
+      }
+      .format-mp3 { background: rgba(29, 185, 84, 0.15); color: #1db954; }
+      .format-m4a { background: rgba(255, 107, 0, 0.15); color: #ff6b00; }
+      .format-rec { background: rgba(225, 48, 108, 0.15); color: #e1306c; }
+      .format-txt { background: rgba(66, 133, 244, 0.15); color: #4285f4; }
+      
+      .meta { font-size: 12px; color: var(--muted); margin-top: 2px; }
+      .icon-btn {
+        background: none; border: none; color: var(--muted); cursor: pointer; padding: 8px; border-radius: 50%;
+        display: flex; align-items: center; justify-content: center; transition: all 0.2s;
+      }
+      .icon-btn:hover { background: rgba(255,255,255,0.1); color: var(--text); }
+
+      /* Auth Warning */
+      #auth-warning {
+        background: rgba(255, 179, 2, 0.1);
+        border: 1px solid rgba(255, 179, 2, 0.3);
+        color: #ffb302;
+        padding: 12px;
+        border-radius: 8px;
+        margin-bottom: 20px;
+        text-align: center;
+        display: none;
+      }
+    </style>
+  </head>
+  <body>
+    <div class="history-container">
+      <div class="history-header">
+        <a href="/" class="back-btn">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M19 12H5m7-7l-7 7 7 7"/></svg>
+          Voltar
+        </a>
+      </div>
+      
+      <div id="auth-warning"></div>
+
+      <div class="card">
+        <div class="card-header">
+          <h2 class="h1">Histórico de Conversões</h2>
+        </div>
+        <div class="card-body" style="padding:0;">
+          <div id="loading" class="empty-history" style="display:block;">Carregando...</div>
+          <div id="history-list"></div>
+          <div id="empty-msg" class="empty-history">
+            Nenhum histórico encontrado.
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <script>
+      const supabaseClient = window.SUPABASE_URL ? supabase.createClient(window.SUPABASE_URL, window.SUPABASE_KEY) : null;
+      const listEl = document.getElementById('history-list');
+      const loadingEl = document.getElementById('loading');
+      const emptyEl = document.getElementById('empty-msg');
+      const authWarning = document.getElementById('auth-warning');
+      
+      async function loadHistory() {
+        if (!supabaseClient) return;
+        
+        const { data: { user } } = await supabaseClient.auth.getUser();
+        
+        if (!user) {
+            loadingEl.style.display = 'none';
+            authWarning.style.display = 'block';
+            return;
+        }
+
+        const { data, error } = await supabaseClient
+          .from('history')
+          .select('*')
+          .order('created_at', { ascending: false })
+          .limit(50);
+          
+        loadingEl.style.display = 'none';
+        
+        if (error) {
+            console.error(error);
+            // Códigos comuns para tabela inexistente: 42P01 (undefined_table) ou status 404
+            if (error.code === '42P01' || error.code === 'PGRST301' || (error.message && error.message.includes('404'))) {
+                 authWarning.innerHTML = 'Tabela de histórico não encontrada.<br>Por favor, execute o SQL de configuração no painel do Supabase.';
+            } else {
+                 authWarning.textContent = 'Erro ao carregar histórico: ' + (error.message || 'Desconhecido');
+            }
+            authWarning.style.display = 'block';
+            return;
+        }
+        
+        if (!data || data.length === 0) {
+            emptyEl.style.display = 'block';
+            return;
+        }
+
+        renderList(data);
+      }
+      
+      function renderList(data) {
+        listEl.innerHTML = '';
+        data.forEach(item => {
+             const div = document.createElement('div');
+             const fmt = (item.format || 'mp3').toLowerCase();
+             div.className = 'history-item';
+             
+             const badge = `<span class="format-badge format-${fmt}">${fmt.toUpperCase()}</span>`;
+             const ts = new Date(item.created_at).toLocaleString();
+             
+             const dlIcon = '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M12 3v10m0 0l4-4m-4 4l-4-4" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/><path d="M20 21H4" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>';
+             
+             let isYt = false;
+             try { const x = new URL(item.url); isYt = /(^|\\.)youtube\\.com$/.test(x.hostname) || x.hostname === 'youtu.be'; } catch {}
+
+             const action = isYt 
+                ? `<a href="/?url=${encodeURIComponent(item.url)}&format=${fmt}" class="icon-btn" title="Baixar novamente">${dlIcon}</a>` 
+                : '';
+
+             div.innerHTML = `
+                <div>
+                  <div style="font-weight:500; margin-bottom:4px; word-break: break-all;">${badge} ${item.url}</div>
+                  <div class="meta">${ts}</div>
+                </div>
+                <div>${action}</div>
+             `;
+             listEl.appendChild(div);
+        });
+      }
+      
+      if (localStorage.getItem('theme') === 'light') {
+        document.body.classList.add('theme-light');
+      }
+      
+      loadHistory();
+    </script>
+  </body>
+</html>
+"""
+
+
+@app.route("/history")
+def history_page():
+    return render_template_string(
+        HISTORY_HTML,
+        supabase_url=os.environ.get("SUPABASE_URL", ""),
+        supabase_key=os.environ.get("SUPABASE_KEY", "")
+    )
 
 
 if __name__ == "__main__":

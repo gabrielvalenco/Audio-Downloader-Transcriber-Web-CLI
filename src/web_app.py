@@ -19,7 +19,8 @@ from download_audio import build_opts, resolve_ffmpeg_location, has_ffmpeg
 
 # Gemini SDK (opcional, só usado na rota /transcribe)
 try:
-    import google.generativeai as genai  # type: ignore
+    from google import genai
+    from google.genai import types
 except Exception:
     genai = None  # fallback: rota /transcribe retorna erro orientando instalar dependência
 
@@ -1346,8 +1347,8 @@ def download():
 @app.route("/transcribe", methods=["POST"])
 def transcribe():
     # Validar dependência
-    if genai is None:  # type: ignore
-        return jsonify({"status": "error", "message": "Dependência 'google-generativeai' não instalada. Rode: python -m pip install google-generativeai"}), 500
+    if genai is None:
+        return jsonify({"status": "error", "message": "Dependência 'google-genai' não instalada. Rode: pip install google-genai"}), 500
     # Ler chave do ambiente (preferir GEMINI_API_KEY, aceitar GOOGLE_API_KEY)
     key = os.environ.get("GEMINI_API_KEY") or os.environ.get("GOOGLE_API_KEY")
     if not key:
@@ -1385,24 +1386,33 @@ def transcribe():
             else:
                 mime = "audio/webm"
 
-        genai.configure(api_key=key)  # type: ignore
+        client = genai.Client(api_key=key)
+
+        content_parts = [
+            types.Part.from_bytes(data=audio_bytes, mime_type=mime),
+            types.Part.from_text(text=prompt)
+        ]
+
         try:
-            model = genai.GenerativeModel(model_name)  # type: ignore
+            response = client.models.generate_content(
+                model=model_name,
+                contents=[types.Content(parts=content_parts)]
+            )
         except Exception:
-            model = genai.GenerativeModel("gemini-1.5-flash")  # type: ignore
+            # Fallback to a default model if the requested one fails
+            response = client.models.generate_content(
+                model="gemini-2.0-flash",
+                contents=[types.Content(parts=content_parts)]
+            )
 
-        parts = [{"mime_type": mime, "data": audio_bytes}, prompt]
-        resp = model.generate_content(parts)  # type: ignore
-
-        text = getattr(resp, "text", None)
+        text = response.text
         if not text:
             try:
-                text = resp.candidates[0].content.parts[0].text  # type: ignore
+                text = response.candidates[0].content.parts[0].text
             except Exception:
                 text = ""
-            return jsonify({"status": "ok", "text": text or ""})
-        else:
-            return jsonify({"status": "ok", "text": "Transcrição concluída (mock)."})
+        
+        return jsonify({"status": "ok", "text": text or ""})
     except Exception as e:
         return jsonify({"status": "error", "message": str(e)}), 500
 
